@@ -7,7 +7,22 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { t } from './translations';
 import { auth, googleProvider } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from './firebase'; 
 
+// Esta función revisa si el usuario tiene permiso
+const checkPremiumStatus = async () => {
+  const user = auth.currentUser;
+  if (user) {
+    const docRef = doc(db, "usuarios", user.uid);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists() && docSnap.data().acceso_pagado === true) {
+      return true; // El usuario pagó
+    }
+  }
+  return false; // No ha pagado o no existe el registro
+};
 const CrossedCircle = (props: any) => {
   const { cx, cy, stroke, fill } = props;
   if (cx === undefined || cy === undefined) return null;
@@ -24,7 +39,7 @@ export default function App() {
   const [lang, setLang] = useState<'es' | 'en'>('es');
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-
+  const [esPremium, setEsPremium] = useState(false);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -32,7 +47,17 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
-
+useEffect(() => {
+  const verificarAcceso = async () => {
+    if (user) {
+      const tieneAcceso = await checkPremiumStatus();
+      setEsPremium(tieneAcceso);
+    } else {
+      setEsPremium(false);
+    }
+  };
+  verificarAcceso();
+}, [user]); // Esto se activa cada vez que el usuario inicia o cierra sesión
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
@@ -633,6 +658,8 @@ export default function App() {
 
                 <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                   <h2 className="text-lg font-bold text-slate-800 mb-6">{t[lang].step5}</h2>
+                  {esPremium ? (
+                  <>
                   {problemDesc && (
                     <div className="mb-6 p-4 bg-slate-50 border-l-4 border-indigo-500 rounded-r-xl text-slate-700 italic">
                       "{t[lang].problemContext} {problemDesc}"
@@ -717,6 +744,26 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                </>
+  ) : (
+    /* --- ESTO ES LO QUE VERÁ EL QUE NO HA PAGADO --- */
+    <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-10 rounded-2xl text-center my-4 shadow-inner">
+      <div className="text-4xl mb-4">🔒</div>
+      <h3 className="text-xl font-bold text-slate-800">Interpretación Profesional Lista</h3>
+      <p className="text-slate-600 mb-6 max-w-sm mx-auto">
+        Los cálculos de ANOVA se han completado. Para desbloquear el <b>diagnóstico detallado y las recomendaciones de acción</b>, adquiere tu acceso permanente.
+      </p>
+      <button 
+        onClick={() => window.open("https://buy.stripe.com/test_8x214p67487m3IFdNf43S00", "_blank")}
+        className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all hover:scale-105 shadow-lg shadow-indigo-100"
+      >
+        Desbloquear por 150 MXN
+      </button>
+      <p className="text-xs text-slate-400 mt-4 italic">
+        Acceso único de por vida • Pago seguro vía Stripe
+      </p>
+    </div>
+  )}
                 </section>
               </div>
             )}
@@ -726,3 +773,4 @@ export default function App() {
     </div>
   );
 }
+
