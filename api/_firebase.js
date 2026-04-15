@@ -122,7 +122,9 @@ const grantPremiumAccessFromSession = async (session, source) => {
   try {
     await syncUserToFirestore(firebaseUid, userRecord, session, source);
   } catch (err) {
-    console.error('[firestore] Sync failed (non-fatal):', err.message);
+    console.error('[firestore] Sync failed — code:', err.code);
+    console.error('[firestore] Sync failed — message:', err.message);
+    console.error('[firestore] Sync failed — stack:', err.stack);
   }
 };
 
