@@ -2,7 +2,7 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 
 const getFirebaseApp = () => {
   if (getApps().length > 0) return getApps()[0];
@@ -30,9 +30,7 @@ const getFirebaseApp = () => {
     });
   }
 
-  throw new Error(
-    '[firebase] No credentials found. Set FIREBASE_SERVICE_ACCOUNT_KEY or the three split vars.'
-  );
+  throw new Error('[firebase] No credentials found. Set FIREBASE_SERVICE_ACCOUNT_KEY or the three split vars.');
 };
 
 const verifyFirebaseToken = async (req, res) => {
@@ -53,13 +51,70 @@ const verifyFirebaseToken = async (req, res) => {
   }
 };
 
+/**
+ * Crea el documento del usuario en Firestore si no existe todavía.
+ * Se llama al hacer login por primera vez.
+ */
+const registerUserIfNew = async (uid) => {
+  const app = getFirebaseApp();
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const userRef = db.collection('usuarios').doc(uid);
+
+  const doc = await userRef.get();
+  if (doc.exists) {
+    console.log(`[register] Usuario ${uid} ya existe en Firestore`);
+    return;
+  }
+
+  const userRecord = await auth.getUser(uid);
+  const now = FieldValue.serverTimestamp();
+
+  await userRef.set({
+    uid,
+    email: userRecord.email || null,
+    displayName: userRecord.displayName || null,
+    photoURL: userRecord.photoURL || null,
+    premium: false,
+    premiumExpiresAt: null,
+    premiumGrantedAt: null,
+    premiumSource: null,
+    lastStripeSessionId: null,
+    payments: [],
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  console.log(`[register] Usuario ${uid} creado en Firestore`);
+};
+
+/**
+ * Agrega 6 meses a partir de hoy o desde la expiración actual si aún no ha vencido,
+ * para no penalizar a quien renueva antes de tiempo.
+ */
+const calcNewExpiration = (currentExpiresAt) => {
+  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+  const base = currentExpiresAt && currentExpiresAt.toMillis
+    ? Math.max(currentExpiresAt.toMillis(), Date.now())
+    : Date.now();
+  return new Date(base + SIX_MONTHS_MS);
+};
+
+/**
+ * Escribe/actualiza el documento del usuario en Firestore al completar un pago.
+ */
 const syncUserToFirestore = async (uid, userRecord, session, source) => {
   const app = getFirebaseApp();
   const db = getFirestore(app);
   const now = FieldValue.serverTimestamp();
-  // serverTimestamp() no puede usarse dentro de arrays — usar ISO string
-  const nowIso = new Date().toISOString();
+  const nowIso = new Date().toISOString(); // Para usar dentro de arrays (serverTimestamp no aplica)
   const userRef = db.collection('usuarios').doc(uid);
+
+  // Leer documento actual para calcular nueva fecha de expiración
+  const doc = await userRef.get();
+  const currentData = doc.exists ? doc.data() : {};
+  const newExpiration = calcNewExpiration(currentData.premiumExpiresAt);
+  const newExpirationTimestamp = Timestamp.fromDate(newExpiration);
 
   const paymentEntry = session
     ? {
@@ -69,34 +124,37 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
         stripeCurrency: session.currency,
         source,
         grantedAt: nowIso,
+        expiresAt: newExpiration.toISOString(),
       }
     : null;
 
-  const premiumData = {
+  const updatePayload = {
     premium: true,
     premiumGrantedAt: now,
+    premiumExpiresAt: newExpirationTimestamp,
     premiumSource: source,
     email: userRecord.email || null,
     displayName: userRecord.displayName || null,
     updatedAt: now,
+    ...(paymentEntry && {
+      payments: FieldValue.arrayUnion(paymentEntry),
+      lastStripeSessionId: session.id,
+    }),
   };
-
-  const updatePayload = paymentEntry
-    ? {
-        ...premiumData,
-        payments: FieldValue.arrayUnion(paymentEntry),
-        lastStripeSessionId: session.id,
-      }
-    : premiumData;
 
   await userRef.set(
     { uid, createdAt: now, ...updatePayload },
     { merge: true }
   );
 
-  console.log(`[firestore] Usuario ${uid} sincronizado en 'usuarios'`);
+  console.log(`[firestore] Usuario ${uid} actualizado. premiumExpiresAt: ${newExpiration.toISOString()}`);
+
+  return newExpirationTimestamp;
 };
 
+/**
+ * Otorga premium vía Custom Claims y registra el pago en Firestore.
+ */
 const grantPremiumAccessFromSession = async (session, source) => {
   const firebaseUid = session?.metadata?.firebaseUid || session?.client_reference_id;
   if (!firebaseUid) throw new Error('Session has no firebase uid metadata.');
@@ -111,23 +169,27 @@ const grantPremiumAccessFromSession = async (session, source) => {
   const userRecord = await auth.getUser(firebaseUid);
   const existingClaims = userRecord.customClaims || {};
 
+  // Primero sincronizar Firestore para obtener la fecha de expiración calculada
+  let expiresAt;
+  try {
+    expiresAt = await syncUserToFirestore(firebaseUid, userRecord, session, source);
+  } catch (err) {
+    console.error('[firestore] Sync failed — code:', err.code);
+    console.error('[firestore] Sync failed — message:', err.message);
+    console.error('[firestore] Sync failed — stack:', err.stack);
+  }
+
+  // Actualizar Custom Claims con la fecha de expiración
   await auth.setCustomUserClaims(firebaseUid, {
     ...existingClaims,
     premium: true,
     premiumSource: source,
     premiumSessionId: session.id,
     premiumUpdatedAt: Date.now(),
+    premiumExpiresAt: expiresAt ? expiresAt.toMillis() : null,
   });
 
   console.log(`[firebase] premium=true set for uid ${firebaseUid}`);
-
-  try {
-    await syncUserToFirestore(firebaseUid, userRecord, session, source);
-  } catch (err) {
-    console.error('[firestore] Sync failed — code:', err.code);
-    console.error('[firestore] Sync failed — message:', err.message);
-    console.error('[firestore] Sync failed — stack:', err.stack);
-  }
 };
 
-module.exports = { verifyFirebaseToken, grantPremiumAccessFromSession };
+module.exports = { verifyFirebaseToken, grantPremiumAccessFromSession, registerUserIfNew };

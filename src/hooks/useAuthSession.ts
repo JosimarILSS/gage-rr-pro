@@ -39,13 +39,26 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   );
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoadingAuth(false);
+
+      if (currentUser) {
+        // Registrar en Firestore si es la primera vez (el endpoint ignora si ya existe)
+        try {
+          const token = await currentUser.getIdToken();
+          await fetch(`${apiBaseUrl}/api/user/register`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (err) {
+          console.error('[auth] register failed (non-fatal):', err);
+        }
+      }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     const refreshPremium = async () => {

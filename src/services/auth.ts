@@ -1,11 +1,47 @@
+import { doc, getDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
+import { db } from '../firebase';
 import type { Lang } from '../types/common';
 
+/**
+ * Verifica el acceso premium leyendo Firestore directamente.
+ *
+ * Reglas:
+ * - premium === false → sin acceso
+ * - premium === true && premiumExpiresAt === null → acceso ilimitado (manual)
+ * - premium === true && premiumExpiresAt > ahora → acceso activo
+ * - premium === true && premiumExpiresAt <= ahora → acceso expirado
+ */
 export const checkPremiumStatus = async (user: User | null): Promise<boolean> => {
   if (!user) return false;
 
-  const tokenResult = await user.getIdTokenResult(true);
-  return tokenResult.claims?.premium === true;
+  try {
+    const snap = await getDoc(doc(db, 'usuarios', user.uid));
+    if (!snap.exists()) {
+      // Documento aún no creado — fallback al Custom Claim
+      const tokenResult = await user.getIdTokenResult(true);
+      return tokenResult.claims?.premium === true;
+    }
+
+    const data = snap.data();
+
+    if (!data.premium) return false;
+
+    // null = acceso manual ilimitado
+    if (data.premiumExpiresAt === null || data.premiumExpiresAt === undefined) return true;
+
+    // Comparar timestamp de Firestore con la fecha actual
+    const expiresMs: number = data.premiumExpiresAt.toMillis
+      ? data.premiumExpiresAt.toMillis()
+      : Number(data.premiumExpiresAt);
+
+    return Date.now() < expiresMs;
+  } catch (err) {
+    console.error('[auth] checkPremiumStatus failed, falling back to claim:', err);
+    // Si Firestore falla, no bloquear al usuario — usar claim como respaldo
+    const tokenResult = await user.getIdTokenResult(true);
+    return tokenResult.claims?.premium === true;
+  }
 };
 
 export const getAuthErrorMessage = (
