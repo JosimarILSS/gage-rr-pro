@@ -27,23 +27,13 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  // Vercel entrega el body como string cuando bodyParser está activo.
-  // Stripe necesita el raw string para verificar la firma.
-  let rawBody;
-  if (typeof req.body === 'string') {
-    rawBody = req.body;
-  } else if (Buffer.isBuffer(req.body)) {
-    rawBody = req.body.toString('utf8');
-  } else if (req.body && typeof req.body === 'object') {
-    rawBody = JSON.stringify(req.body);
-  } else {
-    rawBody = await new Promise((resolve, reject) => {
-      const chunks = [];
-      req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      req.on('error', reject);
-    });
-  }
+  // bodyParser: false en vercel.json → el body llega como stream crudo.
+  const rawBody = await new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
 
   const stripe = new Stripe(STRIPE_SECRET_KEY);
 
