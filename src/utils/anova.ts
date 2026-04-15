@@ -1,6 +1,8 @@
 export function calculateGageRR(data: any[], partCol: string, opCol: string, measCol: string, lsl?: number, usl?: number, sigmaMultiplier: number = 6, includeInteraction: boolean = true) {
+  type MeasurementRecord = { part: string; op: string; meas: number };
+
   // Extract values
-  const records = data.map(d => ({
+  const records: MeasurementRecord[] = data.map(d => ({
     part: String(d[partCol]),
     op: String(d[opCol]),
     meas: Number(d[measCol])
@@ -26,7 +28,7 @@ export function calculateGageRR(data: any[], partCol: string, opCol: string, mea
   }
   
   // To keep it balanced, we take exactly `n` records per combination
-  const balancedRecords = [];
+  const balancedRecords: MeasurementRecord[] = [];
   const currentCounts: Record<string, number> = {};
   for (const d of records) {
     const key = `${d.part}|${d.op}`;
