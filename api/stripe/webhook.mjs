@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { grantPremiumAccessFromSession } from '../_firebase.js';
+import { grantPremiumAccessFromSession } from '../_firebase.mjs';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -51,17 +51,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log(`[webhook] event received: ${event.type}`);
+
     if (
       event.type === 'checkout.session.completed' ||
       event.type === 'checkout.session.async_payment_succeeded'
     ) {
       const session = event.data.object;
+      console.log(`[webhook] processing session ${session.id}, payment_status=${session.payment_status}`);
       await grantPremiumAccessFromSession(session, 'webhook');
+      console.log(`[webhook] grantPremiumAccess completed for session ${session.id}`);
     }
 
     res.json({ received: true });
   } catch (error) {
-    console.error('Stripe webhook processing failed:', error);
+    console.error('[webhook] processing failed:', error);
     res.status(500).json({ error: 'Webhook processing failed.' });
   }
 }

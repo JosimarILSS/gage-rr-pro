@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { verifyFirebaseToken, grantPremiumAccessFromSession } from '../_firebase.js';
+import { verifyFirebaseToken, grantPremiumAccessFromSession } from '../_firebase.mjs';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
