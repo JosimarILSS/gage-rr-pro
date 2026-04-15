@@ -118,7 +118,7 @@ try {
   const snap = await userRef.get();
   const serverNow = FieldValue.serverTimestamp();
 
-  if (!snap.exists()) {
+  if (!snap.exists) {
     // Primera vez — crear documento completo
     await userRef.set({
       uid,

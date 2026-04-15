@@ -62,30 +62,44 @@ const registerUserIfNew = async (uid) => {
   const userRef = db.collection('usuarios').doc(uid);
 
   const doc = await userRef.get();
-  if (doc.exists) {
-    console.log(`[register] Usuario ${uid} ya existe en Firestore`);
-    return;
-  }
-
   const userRecord = await auth.getUser(uid);
   const now = FieldValue.serverTimestamp();
 
-  await userRef.set({
-    uid,
-    email: userRecord.email || null,
-    displayName: userRecord.displayName || null,
-    photoURL: userRecord.photoURL || null,
-    premium: false,
-    premiumExpiresAt: null,
-    premiumGrantedAt: null,
-    premiumSource: null,
-    lastStripeSessionId: null,
-    payments: [],
-    createdAt: now,
-    updatedAt: now,
-  });
+  if (!doc.exists) {
+    // Primera vez — crear documento completo
+    await userRef.set({
+      uid,
+      email: userRecord.email || null,
+      displayName: userRecord.displayName || null,
+      photoURL: userRecord.photoURL || null,
+      premium: false,
+      premiumExpiresAt: null,
+      premiumGrantedAt: null,
+      premiumSource: null,
+      lastStripeSessionId: null,
+      payments: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    console.log(`[register] Usuario ${uid} creado en Firestore`);
+    return;
+  }
 
-  console.log(`[register] Usuario ${uid} creado en Firestore`);
+  // Ya existe — rellenar solo los campos de perfil que falten (no tocar premium ni pagos)
+  const data = doc.data();
+  const profileUpdate = {};
+
+  if (!data.email && userRecord.email) profileUpdate.email = userRecord.email;
+  if (!data.displayName && userRecord.displayName) profileUpdate.displayName = userRecord.displayName;
+  if (!data.photoURL && userRecord.photoURL) profileUpdate.photoURL = userRecord.photoURL;
+
+  if (Object.keys(profileUpdate).length > 0) {
+    profileUpdate.updatedAt = now;
+    await userRef.update(profileUpdate);
+    console.log(`[register] Perfil de ${uid} actualizado:`, Object.keys(profileUpdate).join(', '));
+  } else {
+    console.log(`[register] Usuario ${uid} ya tiene perfil completo`);
+  }
 };
 
 /**
