@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { AlertCircle, BarChart3, CheckCircle2, FileSpreadsheet, Globe, Info, LogOut, Settings, Upload, Users } from 'lucide-react';
 import {
   Bar,
@@ -81,6 +82,21 @@ export default function AnalysisPage({
     validation,
     results,
   } = workspace;
+
+  const section4Ref = useRef<HTMLDivElement>(null);
+  const section5Ref = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Al volver de Stripe con checkout=success, hacer scroll a sección 5
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success' && esPremium) {
+      setTimeout(() => scrollTo(section5Ref), 600);
+    }
+  }, [esPremium]);
 
   const chartColors = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -252,8 +268,8 @@ export default function AnalysisPage({
                       <p className="text-sm font-medium">{t[lang].validData}</p>
                     </div>
                     
-                    <button 
-                      onClick={() => setShowResults(true)}
+                    <button
+                      onClick={() => { setShowResults(true); setTimeout(() => scrollTo(section4Ref), 100); }}
                       className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2"
                     >
                       <BarChart3 className="w-4 h-4" />
@@ -267,7 +283,7 @@ export default function AnalysisPage({
             {/* 4 & 5. Resultados e Interpretación */}
             {showResults && results && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <section ref={section4Ref} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                   <h2 className="text-lg font-bold text-slate-800 mb-6">{t[lang].step4}</h2>
                   
                   <div className="overflow-x-auto border border-slate-200 rounded-xl mb-6">
@@ -502,7 +518,7 @@ export default function AnalysisPage({
                   </div>
                 </section>
 
-                <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <section ref={section5Ref} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                   <h2 className="text-lg font-bold text-slate-800 mb-6">{t[lang].step5}</h2>
                   {esPremium ? (
                     <>

@@ -89,15 +89,18 @@ const registerUserIfNew = async (uid) => {
 };
 
 /**
- * Agrega 6 meses a partir de hoy o desde la expiración actual si aún no ha vencido,
- * para no penalizar a quien renueva antes de tiempo.
+ * Calcula la fecha de expiración: siempre 6 meses exactos desde el momento del pago.
  */
-const calcNewExpiration = (currentExpiresAt) => {
-  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
-  const base = currentExpiresAt && currentExpiresAt.toMillis
-    ? Math.max(currentExpiresAt.toMillis(), Date.now())
-    : Date.now();
-  return new Date(base + SIX_MONTHS_MS);
+const calcNewExpiration = () => {
+  const now = new Date();
+  return new Date(
+    now.getFullYear(),
+    now.getMonth() + 6,
+    now.getDate(),
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+  );
 };
 
 /**
@@ -110,10 +113,7 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
   const nowIso = new Date().toISOString(); // Para usar dentro de arrays (serverTimestamp no aplica)
   const userRef = db.collection('usuarios').doc(uid);
 
-  // Leer documento actual para calcular nueva fecha de expiración
-  const doc = await userRef.get();
-  const currentData = doc.exists ? doc.data() : {};
-  const newExpiration = calcNewExpiration(currentData.premiumExpiresAt);
+  const newExpiration = calcNewExpiration();
   const newExpirationTimestamp = Timestamp.fromDate(newExpiration);
 
   const paymentEntry = session

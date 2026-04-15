@@ -158,6 +158,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
       await loadStripe(payload.publishableKey || '');
       if (!payload?.url) throw new Error('Checkout URL missing.');
+      // Guardar posición de scroll para restaurarla al volver (la app siempre irá a sección 5)
+      sessionStorage.setItem('scrollBeforeCheckout', String(window.scrollY));
       window.location.assign(payload.url);
     } catch (error) {
       console.error('Error starting Stripe checkout:', error);
