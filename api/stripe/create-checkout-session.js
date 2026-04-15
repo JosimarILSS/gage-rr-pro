@@ -1,8 +1,11 @@
-import Stripe from 'stripe';
-import { verifyFirebaseToken } from '../_firebase.mjs';
-import admin from 'firebase-admin';
+'use strict';
 
-export default async function handler(req, res) {
+const Stripe = require('stripe');
+const { verifyFirebaseToken } = require('../_firebase.js');
+const { getApps } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
@@ -14,10 +17,13 @@ export default async function handler(req, res) {
   const STRIPE_AMOUNT_MXN = Number(process.env.STRIPE_AMOUNT_MXN || 15000);
   const STRIPE_PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium de por vida - Gage RR Pro';
 
-  console.log('[create-checkout] STRIPE_AMOUNT_MXN =', STRIPE_AMOUNT_MXN);
-  console.log('[create-checkout] STRIPE_PRICE_ID =', STRIPE_PRICE_ID || '(not set)');
+  console.log('[create-checkout] STRIPE_SECRET_KEY present:', !!STRIPE_SECRET_KEY);
+  console.log('[create-checkout] STRIPE_PUBLISHABLE_KEY present:', !!STRIPE_PUBLISHABLE_KEY);
+  console.log('[create-checkout] STRIPE_AMOUNT_MXN:', STRIPE_AMOUNT_MXN);
+  console.log('[create-checkout] STRIPE_PRICE_ID:', STRIPE_PRICE_ID || '(not set, using price_data)');
 
   if (!STRIPE_SECRET_KEY || !STRIPE_PUBLISHABLE_KEY) {
+    console.error('[create-checkout] Missing Stripe env vars');
     res.status(503).json({ error: 'Stripe is not configured.' });
     return;
   }
@@ -28,13 +34,14 @@ export default async function handler(req, res) {
   const stripe = new Stripe(STRIPE_SECRET_KEY);
 
   try {
-    const userRecord = await admin.auth().getUser(decodedToken.uid);
+    const app = getApps()[0];
+    const userRecord = await getAuth(app).getUser(decodedToken.uid);
     if (userRecord.customClaims?.premium === true) {
       res.json({ alreadyPaid: true });
       return;
     }
 
-    const origin = req.headers.origin || process.env.APP_URL || 'https://your-app.vercel.app';
+    const origin = req.headers.origin || process.env.APP_URL || 'https://gage-rr-pro.vercel.app';
     const successUrl = `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${origin}/?checkout=cancel`;
 
@@ -61,13 +68,15 @@ export default async function handler(req, res) {
       metadata: { firebaseUid: decodedToken.uid },
     });
 
+    console.log('[create-checkout] Session created:', session.id);
+
     res.json({
       sessionId: session.id,
       publishableKey: STRIPE_PUBLISHABLE_KEY,
       url: session.url,
     });
   } catch (error) {
-    console.error('Failed to create Stripe checkout session:', error);
+    console.error('[create-checkout] Failed:', error.message);
     res.status(500).json({ error: 'Could not create checkout session.' });
   }
-}
+};

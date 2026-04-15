@@ -1,35 +1,41 @@
-import admin from 'firebase-admin';
+'use strict';
 
-export const initFirebaseAdmin = () => {
-  if (admin.apps.length > 0) return;
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+
+const getFirebaseApp = () => {
+  if (getApps().length > 0) return getApps()[0];
 
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
+  console.log('[firebase] SERVICE_ACCOUNT_KEY present:', !!serviceAccountJson);
+  console.log('[firebase] PROJECT_ID present:', !!projectId);
+
   if (serviceAccountJson) {
     const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    return;
+    return initializeApp({ credential: cert(serviceAccount) });
   }
 
   if (projectId && clientEmail && privateKey) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+    return initializeApp({
+      credential: cert({
         projectId,
         clientEmail,
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
-    return;
   }
 
-  admin.initializeApp({ credential: admin.credential.applicationDefault() });
+  throw new Error(
+    '[firebase] No credentials found. Set FIREBASE_SERVICE_ACCOUNT_KEY or the three split vars.'
+  );
 };
 
-export const verifyFirebaseToken = async (req, res) => {
-  initFirebaseAdmin();
+const verifyFirebaseToken = async (req, res) => {
   const authorization = req.headers.authorization || '';
   if (!authorization.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Missing bearer token.' });
@@ -38,36 +44,32 @@ export const verifyFirebaseToken = async (req, res) => {
 
   const idToken = authorization.slice('Bearer '.length);
   try {
-    return await admin.auth().verifyIdToken(idToken);
+    const app = getFirebaseApp();
+    return await getAuth(app).verifyIdToken(idToken);
   } catch (error) {
-    console.error('Firebase token verification failed:', error);
+    console.error('[firebase] Token verification failed:', error.message);
     res.status(401).json({ error: 'Invalid Firebase ID token.' });
     return null;
   }
 };
 
-/**
- * Escribe o actualiza el documento users/{uid} en Firestore con los datos del pago.
- * Si el documento no existe lo crea; si ya existe hace merge para no sobreescribir
- * campos que pudieran haberse puesto manualmente (p. ej. acceso gratuito manual).
- */
 const syncUserToFirestore = async (uid, userRecord, session, source) => {
-  const db = admin.firestore();
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  const app = getFirebaseApp();
+  const db = getFirestore(app);
+  const now = FieldValue.serverTimestamp();
   const userRef = db.collection('usuarios').doc(uid);
 
   const paymentEntry = session
     ? {
         stripeSessionId: session.id,
         stripePaymentStatus: session.payment_status,
-        stripeAmountTotal: session.amount_total,        // en centavos
+        stripeAmountTotal: session.amount_total,
         stripeCurrency: session.currency,
         source,
         grantedAt: now,
       }
     : null;
 
-  // Datos que siempre se actualizan al otorgar premium
   const premiumData = {
     premium: true,
     premiumGrantedAt: now,
@@ -77,45 +79,36 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
     updatedAt: now,
   };
 
-  // Si hay sesión de Stripe, añadimos el pago al array de pagos
   const updatePayload = paymentEntry
     ? {
         ...premiumData,
-        payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
+        payments: FieldValue.arrayUnion(paymentEntry),
         lastStripeSessionId: session.id,
       }
     : premiumData;
 
-  // setMerge para no sobreescribir campos manuales (p. ej. nota interna, acceso manual)
   await userRef.set(
-    {
-      uid,
-      createdAt: now,   // solo se escribe si el doc no existe (merge lo respeta)
-      ...updatePayload,
-    },
+    { uid, createdAt: now, ...updatePayload },
     { merge: true }
   );
+
+  console.log(`[firestore] Usuario ${uid} sincronizado en 'usuarios'`);
 };
 
-/**
- * Otorga premium vía Custom Claims y registra el evento en Firestore.
- * Funciona para pagos de Stripe (webhook / confirm-session).
- */
-export const grantPremiumAccessFromSession = async (session, source) => {
-  initFirebaseAdmin();
+const grantPremiumAccessFromSession = async (session, source) => {
   const firebaseUid = session?.metadata?.firebaseUid || session?.client_reference_id;
   if (!firebaseUid) throw new Error('Session has no firebase uid metadata.');
 
   const paymentStatus = session.payment_status;
   if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
-    throw new Error(`Session ${session.id} is not paid yet. payment_status=${paymentStatus}`);
+    throw new Error(`Session ${session.id} not paid. payment_status=${paymentStatus}`);
   }
 
-  const auth = admin.auth();
+  const app = getFirebaseApp();
+  const auth = getAuth(app);
   const userRecord = await auth.getUser(firebaseUid);
   const existingClaims = userRecord.customClaims || {};
 
-  // 1. Actualizar Custom Claims (lo que usa el frontend para verificar acceso)
   await auth.setCustomUserClaims(firebaseUid, {
     ...existingClaims,
     premium: true,
@@ -124,11 +117,13 @@ export const grantPremiumAccessFromSession = async (session, source) => {
     premiumUpdatedAt: Date.now(),
   });
 
-  // 2. Registrar en Firestore para seguimiento
+  console.log(`[firebase] premium=true set for uid ${firebaseUid}`);
+
   try {
     await syncUserToFirestore(firebaseUid, userRecord, session, source);
   } catch (err) {
-    // No bloquear el flujo de pago si Firestore falla
-    console.error('Firestore sync failed (non-fatal):', err);
+    console.error('[firestore] Sync failed (non-fatal):', err.message);
   }
 };
+
+module.exports = { verifyFirebaseToken, grantPremiumAccessFromSession };
