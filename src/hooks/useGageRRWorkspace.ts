@@ -3,6 +3,39 @@ import { calculateGageRR } from '../utils/anova';
 import { parseUploadedFile } from '../services/file-parser';
 import type { DataRow, Lang, ValidationResult } from '../types/common';
 
+const SESSION_KEY = 'gagerr_workspace';
+
+type PersistedWorkspace = {
+  problemDesc: string;
+  data: DataRow[];
+  columns: string[];
+  partCol: string;
+  opCol: string;
+  measCol: string;
+  lie: string;
+  lse: string;
+  sigmaMultiplier: number;
+  includeInteraction: boolean;
+  showResults: boolean;
+};
+
+const loadFromSession = (): Partial<PersistedWorkspace> => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as PersistedWorkspace) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveToSession = (state: PersistedWorkspace) => {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+  } catch {
+    // sessionStorage lleno o deshabilitado — ignorar silenciosamente
+  }
+};
+
 type UseGageRRWorkspaceResult = {
   problemDesc: string;
   setProblemDesc: (value: string) => void;
@@ -30,31 +63,74 @@ type UseGageRRWorkspaceResult = {
 };
 
 export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
-  const [problemDesc, setProblemDesc] = useState('');
-  const [data, setData] = useState<DataRow[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
-  const [partCol, setPartCol] = useState('');
-  const [opCol, setOpCol] = useState('');
-  const [measCol, setMeasCol] = useState('');
-  const [lie, setLie] = useState('');
-  const [lse, setLse] = useState('');
-  const [sigmaMultiplier, setSigmaMultiplier] = useState(6);
-  const [includeInteraction, setIncludeInteraction] = useState(true);
-  const [showResults, setShowResults] = useState(false);
+  const saved = useMemo(() => loadFromSession(), []);
+
+  const [problemDesc, setProblemDescRaw] = useState(saved.problemDesc ?? '');
+  const [data, setDataRaw] = useState<DataRow[]>(saved.data ?? []);
+  const [columns, setColumnsRaw] = useState<string[]>(saved.columns ?? []);
+  const [partCol, setPartColRaw] = useState(saved.partCol ?? '');
+  const [opCol, setOpColRaw] = useState(saved.opCol ?? '');
+  const [measCol, setMeasColRaw] = useState(saved.measCol ?? '');
+  const [lie, setLieRaw] = useState(saved.lie ?? '');
+  const [lse, setLseRaw] = useState(saved.lse ?? '');
+  const [sigmaMultiplier, setSigmaMultiplierRaw] = useState(saved.sigmaMultiplier ?? 6);
+  const [includeInteraction, setIncludeInteractionRaw] = useState(saved.includeInteraction ?? true);
+  const [showResults, setShowResultsRaw] = useState(saved.showResults ?? false);
+
+  // Wrapper que actualiza state y persiste en sessionStorage
+  const persist = (patch: Partial<PersistedWorkspace>) => {
+    saveToSession({
+      problemDesc,
+      data,
+      columns,
+      partCol,
+      opCol,
+      measCol,
+      lie,
+      lse,
+      sigmaMultiplier,
+      includeInteraction,
+      showResults,
+      ...patch,
+    });
+  };
+
+  const setProblemDesc = (v: string) => { setProblemDescRaw(v); persist({ problemDesc: v }); };
+  const setPartCol = (v: string) => { setPartColRaw(v); persist({ partCol: v }); };
+  const setOpCol = (v: string) => { setOpColRaw(v); persist({ opCol: v }); };
+  const setMeasCol = (v: string) => { setMeasColRaw(v); persist({ measCol: v }); };
+  const setLie = (v: string) => { setLieRaw(v); persist({ lie: v }); };
+  const setLse = (v: string) => { setLseRaw(v); persist({ lse: v }); };
+  const setSigmaMultiplier = (v: number) => { setSigmaMultiplierRaw(v); persist({ sigmaMultiplier: v }); };
+  const setIncludeInteraction = (v: boolean) => { setIncludeInteractionRaw(v); persist({ includeInteraction: v }); };
+  const setShowResults = (v: boolean) => { setShowResultsRaw(v); persist({ showResults: v }); };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setShowResults(false);
+    setShowResultsRaw(false);
 
     try {
       const parsed = await parseUploadedFile(file);
-      setData(parsed.data);
-      setColumns(parsed.columns);
-      setPartCol(parsed.columns[0] || '');
-      setOpCol(parsed.columns[1] || '');
-      setMeasCol(parsed.columns[2] || '');
+      const newPartCol = parsed.columns[0] || '';
+      const newOpCol = parsed.columns[1] || '';
+      const newMeasCol = parsed.columns[2] || '';
+
+      setDataRaw(parsed.data);
+      setColumnsRaw(parsed.columns);
+      setPartColRaw(newPartCol);
+      setOpColRaw(newOpCol);
+      setMeasColRaw(newMeasCol);
+
+      persist({
+        data: parsed.data,
+        columns: parsed.columns,
+        partCol: newPartCol,
+        opCol: newOpCol,
+        measCol: newMeasCol,
+        showResults: false,
+      });
     } catch (error) {
       console.error('Error parsing uploaded file:', error);
     }
@@ -190,6 +266,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
     validation,
     results,
   };
+
 };
 
 export type { UseGageRRWorkspaceResult };

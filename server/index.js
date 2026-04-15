@@ -151,6 +151,45 @@ const verifyFirebaseToken = async (req, res) => {
   }
 };
 
+const syncUserToFirestore = async (uid, userRecord, session, source) => {
+  const db = admin.firestore();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const userRef = db.collection('usuarios').doc(uid);
+
+  const paymentEntry = session
+    ? {
+        stripeSessionId: session.id,
+        stripePaymentStatus: session.payment_status,
+        stripeAmountTotal: session.amount_total,
+        stripeCurrency: session.currency,
+        source,
+        grantedAt: now,
+      }
+    : null;
+
+  const premiumData = {
+    premium: true,
+    premiumGrantedAt: now,
+    premiumSource: source,
+    email: userRecord.email || null,
+    displayName: userRecord.displayName || null,
+    updatedAt: now,
+  };
+
+  const updatePayload = paymentEntry
+    ? {
+        ...premiumData,
+        payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
+        lastStripeSessionId: session.id,
+      }
+    : premiumData;
+
+  await userRef.set(
+    { uid, createdAt: now, ...updatePayload },
+    { merge: true }
+  );
+};
+
 const grantPremiumAccessFromSession = async (session, source) => {
   const firebaseUid = session?.metadata?.firebaseUid || session?.client_reference_id;
   if (!firebaseUid) {
@@ -165,6 +204,8 @@ const grantPremiumAccessFromSession = async (session, source) => {
   const auth = admin.auth();
   const userRecord = await auth.getUser(firebaseUid);
   const existingClaims = userRecord.customClaims || {};
+
+  // 1. Custom Claims — lo que verifica el frontend
   await auth.setCustomUserClaims(firebaseUid, {
     ...existingClaims,
     premium: true,
@@ -172,6 +213,13 @@ const grantPremiumAccessFromSession = async (session, source) => {
     premiumSessionId: session.id,
     premiumUpdatedAt: Date.now(),
   });
+
+  // 2. Firestore — registro para seguimiento
+  try {
+    await syncUserToFirestore(firebaseUid, userRecord, session, source);
+  } catch (err) {
+    console.error('Firestore sync failed (non-fatal):', err);
+  }
 };
 
 app.post('/api/stripe/create-checkout-session', async (req, res) => {

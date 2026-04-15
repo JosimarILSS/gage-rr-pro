@@ -46,6 +46,61 @@ export const verifyFirebaseToken = async (req, res) => {
   }
 };
 
+/**
+ * Escribe o actualiza el documento users/{uid} en Firestore con los datos del pago.
+ * Si el documento no existe lo crea; si ya existe hace merge para no sobreescribir
+ * campos que pudieran haberse puesto manualmente (p. ej. acceso gratuito manual).
+ */
+const syncUserToFirestore = async (uid, userRecord, session, source) => {
+  const db = admin.firestore();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const userRef = db.collection('usuarios').doc(uid);
+
+  const paymentEntry = session
+    ? {
+        stripeSessionId: session.id,
+        stripePaymentStatus: session.payment_status,
+        stripeAmountTotal: session.amount_total,        // en centavos
+        stripeCurrency: session.currency,
+        source,
+        grantedAt: now,
+      }
+    : null;
+
+  // Datos que siempre se actualizan al otorgar premium
+  const premiumData = {
+    premium: true,
+    premiumGrantedAt: now,
+    premiumSource: source,
+    email: userRecord.email || null,
+    displayName: userRecord.displayName || null,
+    updatedAt: now,
+  };
+
+  // Si hay sesión de Stripe, añadimos el pago al array de pagos
+  const updatePayload = paymentEntry
+    ? {
+        ...premiumData,
+        payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
+        lastStripeSessionId: session.id,
+      }
+    : premiumData;
+
+  // setMerge para no sobreescribir campos manuales (p. ej. nota interna, acceso manual)
+  await userRef.set(
+    {
+      uid,
+      createdAt: now,   // solo se escribe si el doc no existe (merge lo respeta)
+      ...updatePayload,
+    },
+    { merge: true }
+  );
+};
+
+/**
+ * Otorga premium vía Custom Claims y registra el evento en Firestore.
+ * Funciona para pagos de Stripe (webhook / confirm-session).
+ */
 export const grantPremiumAccessFromSession = async (session, source) => {
   initFirebaseAdmin();
   const firebaseUid = session?.metadata?.firebaseUid || session?.client_reference_id;
@@ -59,6 +114,8 @@ export const grantPremiumAccessFromSession = async (session, source) => {
   const auth = admin.auth();
   const userRecord = await auth.getUser(firebaseUid);
   const existingClaims = userRecord.customClaims || {};
+
+  // 1. Actualizar Custom Claims (lo que usa el frontend para verificar acceso)
   await auth.setCustomUserClaims(firebaseUid, {
     ...existingClaims,
     premium: true,
@@ -66,4 +123,12 @@ export const grantPremiumAccessFromSession = async (session, source) => {
     premiumSessionId: session.id,
     premiumUpdatedAt: Date.now(),
   });
+
+  // 2. Registrar en Firestore para seguimiento
+  try {
+    await syncUserToFirestore(firebaseUid, userRecord, session, source);
+  } catch (err) {
+    // No bloquear el flujo de pago si Firestore falla
+    console.error('Firestore sync failed (non-fatal):', err);
+  }
 };
