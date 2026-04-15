@@ -57,6 +57,8 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
   const app = getFirebaseApp();
   const db = getFirestore(app);
   const now = FieldValue.serverTimestamp();
+  // serverTimestamp() no puede usarse dentro de arrays — usar ISO string
+  const nowIso = new Date().toISOString();
   const userRef = db.collection('usuarios').doc(uid);
 
   const paymentEntry = session
@@ -66,7 +68,7 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
         stripeAmountTotal: session.amount_total,
         stripeCurrency: session.currency,
         source,
-        grantedAt: now,
+        grantedAt: nowIso,
       }
     : null;
 
