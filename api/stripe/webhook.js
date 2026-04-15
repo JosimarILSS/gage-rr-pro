@@ -3,7 +3,7 @@
 const Stripe = require('stripe');
 const { grantPremiumAccessFromSession } = require('../_firebase.js');
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  // bodyParser: false en vercel.json → el body llega como stream crudo.
+  // bodyParser: false → el body llega como stream crudo, necesario para verificar firma de Stripe.
   const rawBody = await new Promise((resolve, reject) => {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -64,4 +64,9 @@ module.exports = async function handler(req, res) {
     console.error('[webhook] Processing failed:', error.message);
     res.status(500).json({ error: 'Webhook processing failed.' });
   }
-};
+}
+
+// Desactiva el bodyParser de Vercel para recibir el body crudo de Stripe.
+handler.config = { api: { bodyParser: false } };
+
+module.exports = handler;
