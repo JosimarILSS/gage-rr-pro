@@ -2,17 +2,20 @@ import Stripe from 'stripe';
 import { verifyFirebaseToken } from '../_firebase.mjs';
 import admin from 'firebase-admin';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
-const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
-const STRIPE_AMOUNT_MXN = Number(process.env.STRIPE_AMOUNT_MXN || 15000);
-const STRIPE_PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium de por vida - Gage RR Pro';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
   }
+
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
+  const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+  const STRIPE_AMOUNT_MXN = Number(process.env.STRIPE_AMOUNT_MXN || 15000);
+  const STRIPE_PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium de por vida - Gage RR Pro';
+
+  console.log('[create-checkout] STRIPE_AMOUNT_MXN =', STRIPE_AMOUNT_MXN);
+  console.log('[create-checkout] STRIPE_PRICE_ID =', STRIPE_PRICE_ID || '(not set)');
 
   if (!STRIPE_SECRET_KEY || !STRIPE_PUBLISHABLE_KEY) {
     res.status(503).json({ error: 'Stripe is not configured.' });

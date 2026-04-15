@@ -1,9 +1,6 @@
 import Stripe from 'stripe';
 import { grantPremiumAccessFromSession } from '../_firebase.mjs';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-
 // Vercel must NOT parse the body — Stripe needs the raw bytes to verify the signature.
 export const config = { api: { bodyParser: false } };
 
@@ -21,7 +18,11 @@ export default async function handler(req, res) {
     return;
   }
 
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
   if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+    console.error('[webhook] Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET');
     res.status(503).send('Webhook is not configured.');
     return;
   }
