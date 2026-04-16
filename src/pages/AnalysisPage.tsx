@@ -121,33 +121,38 @@ export default function AnalysisPage({
   };
 
   const handleExportPDF = async () => {
-    console.log('[PDF] click — el:', mainPanelRef.current, '| isExportingPDF:', isExportingPDF, '| results:', !!results);
     const el = mainPanelRef.current;
     if (!el || isExportingPDF) return;
 
     setIsExportingPDF(true);
 
-    // Guardar estado original del contenedor
-    const prevOverflow = el.style.overflow;
-    const prevHeight = el.style.height;
-    const prevScroll = el.scrollTop;
+    let clone: HTMLElement | null = null;
 
     try {
       const { default: html2canvas } = await import('html2canvas');
       const { default: jsPDF } = await import('jspdf');
 
-      // Expandir el contenedor para que html2canvas vea TODO el contenido
-      el.style.overflow = 'visible';
-      el.style.height = 'auto';
-      el.scrollTop = 0;
-
-      // Pausa para que Recharts re-renderice los SVG en el nuevo tamaño
-      await new Promise((r) => setTimeout(r, 400));
-
       const fullWidth = el.scrollWidth;
       const fullHeight = el.scrollHeight;
 
-      const canvas = await html2canvas(el, {
+      // Clonar en un div temporal fuera del viewport, sin restricciones de overflow
+      clone = el.cloneNode(true) as HTMLElement;
+      clone.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: -9999px;
+        width: ${fullWidth}px;
+        height: ${fullHeight}px;
+        overflow: visible;
+        z-index: -1;
+        background: white;
+      `;
+      document.body.appendChild(clone);
+
+      // Pausa para que el DOM se pinte
+      await new Promise((r) => setTimeout(r, 300));
+
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -155,11 +160,9 @@ export default function AnalysisPage({
         height: fullHeight,
         windowWidth: fullWidth,
         windowHeight: fullHeight,
-        x: 0,
-        y: 0,
       });
 
-      const pageWidth = 210; // A4 mm
+      const pageWidth = 210;
       const pageHeight = 297;
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * pageWidth) / canvas.width;
@@ -193,10 +196,7 @@ export default function AnalysisPage({
     } catch (err) {
       console.error('[PDF] Error generating PDF:', err);
     } finally {
-      // Restaurar el contenedor siempre, incluso si hubo error
-      el.style.overflow = prevOverflow;
-      el.style.height = prevHeight;
-      el.scrollTop = prevScroll;
+      if (clone && document.body.contains(clone)) document.body.removeChild(clone);
       setIsExportingPDF(false);
     }
   };
