@@ -121,6 +121,7 @@ export default function AnalysisPage({
   };
 
   const handleExportPDF = async () => {
+    console.log('[PDF] click — el:', mainPanelRef.current, '| isExportingPDF:', isExportingPDF, '| results:', !!results);
     const el = mainPanelRef.current;
     if (!el || isExportingPDF) return;
 
@@ -190,7 +191,7 @@ export default function AnalysisPage({
       const baseName = fileName ? fileName.replace(/\.[^.]+$/, '') : 'gage-rr';
       pdf.save(`${baseName}-resultado.pdf`);
     } catch (err) {
-      console.error('Error generating PDF:', err);
+      console.error('[PDF] Error generating PDF:', err);
     } finally {
       // Restaurar el contenedor siempre, incluso si hubo error
       el.style.overflow = prevOverflow;
