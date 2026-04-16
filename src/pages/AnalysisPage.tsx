@@ -121,55 +121,17 @@ export default function AnalysisPage({
   };
 
   const handleExportPDF = () => {
-    const el = mainPanelRef.current;
-    if (!el || isExportingPDF) return;
-
+    if (isExportingPDF) return;
     setIsExportingPDF(true);
-
-    const style = document.createElement('style');
-    style.id = 'pdf-print-style';
-    style.textContent = `
-      @media print {
-        body > * { display: none !important; }
-        #pdf-print-root { display: block !important; }
-
-        #pdf-print-root {
-          position: fixed;
-          inset: 0;
-          overflow: visible;
-          background: white;
-          padding: 24px;
-          box-sizing: border-box;
-        }
-
-        #pdf-print-root * {
-          overflow: visible !important;
-          max-height: none !important;
-        }
-
-        @page { margin: 10mm; size: A4 portrait; }
-      }
-    `;
-    document.head.appendChild(style);
-
-    // Envolver el contenido en un div con id conocido
-    const wrapper = document.createElement('div');
-    wrapper.id = 'pdf-print-root';
-    wrapper.style.display = 'none';
-    wrapper.appendChild(el.cloneNode(true));
-    document.body.appendChild(wrapper);
+    document.body.classList.add('printing-pdf');
 
     const cleanup = () => {
-      document.head.removeChild(style);
-      document.body.removeChild(wrapper);
+      document.body.classList.remove('printing-pdf');
       setIsExportingPDF(false);
     };
 
-    // Escuchar afterprint para limpiar
     window.addEventListener('afterprint', cleanup, { once: true });
-
-    // Pequeña pausa para que el DOM esté listo
-    setTimeout(() => window.print(), 200);
+    setTimeout(() => window.print(), 150);
   };
 
   // Al volver de Stripe con checkout=success, hacer scroll a sección 5
@@ -214,7 +176,7 @@ export default function AnalysisPage({
           />
         </div>
 
-        <div className="space-y-3">
+        <div id="print-sidebar-hide" className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{t[lang].loadData}</h2>
           <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -257,7 +219,7 @@ export default function AnalysisPage({
           </button>
         </div>
 
-        <div className="mt-auto pt-6 border-t border-slate-200">
+        <div id="print-logout-hide" className="mt-auto pt-6 border-t border-slate-200">
           <div className="flex items-center justify-between">
             <div className="text-sm text-slate-600 truncate pr-2" title={userEmail || ''}>
               {userEmail}

@@ -1,1 +1,86 @@
 @import "tailwindcss";
+
+/* ── Estilos de impresión para "Generar PDF" ─────────────────────────────── */
+@media print {
+  body.printing-pdf {
+    background: white !important;
+  }
+
+  /* Ocultar todo excepto #root */
+  body.printing-pdf > *:not(#root) {
+    display: none !important;
+  }
+
+  /* #root y su hijo directo (el div del SidebarLayout) */
+  body.printing-pdf #root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* El div contenedor flex del SidebarLayout: convertir a block para que fluya */
+  body.printing-pdf #root > div {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Sidebar izquierdo */
+  body.printing-pdf #print-sidebar {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border-right: none !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 12px !important;
+    box-shadow: none !important;
+  }
+
+  /* Ocultar controles interactivos del sidebar */
+  body.printing-pdf #print-sidebar-hide,
+  body.printing-pdf #print-logout-hide {
+    display: none !important;
+  }
+
+  /* Panel principal de resultados */
+  body.printing-pdf #print-main {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* Liberar cualquier overflow interno */
+  body.printing-pdf #print-main *,
+  body.printing-pdf #print-sidebar * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* SVG de Recharts */
+  body.printing-pdf .recharts-wrapper,
+  body.printing-pdf .recharts-surface {
+    overflow: visible !important;
+  }
+
+  /* Evitar cortes dentro de secciones y gráficas */
+  body.printing-pdf section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.printing-pdf .recharts-wrapper {
+    break-inside: avoid !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+}
