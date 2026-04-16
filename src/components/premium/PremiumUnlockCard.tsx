@@ -59,7 +59,7 @@ export default function PremiumUnlockCard({
         <button
           onClick={() => setIsModalOpen(true)}
           disabled={isCheckoutLoading}
-          className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all hover:scale-105 shadow-lg shadow-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all hover:scale-105 shadow-lg shadow-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
         >
           {isCheckoutLoading ? copy.loading : copy.button}
         </button>
@@ -74,7 +74,7 @@ export default function PremiumUnlockCard({
           <button
             type="button"
             onClick={() => setIsModalOpen(false)}
-            className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+            className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
           >
             {copy.modalCancel}
           </button>
@@ -82,7 +82,7 @@ export default function PremiumUnlockCard({
             type="button"
             onClick={handleConfirm}
             disabled={isCheckoutLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
           >
             {isCheckoutLoading ? copy.loading : copy.modalConfirm}
           </button>

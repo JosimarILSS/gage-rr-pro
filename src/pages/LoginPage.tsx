@@ -28,7 +28,7 @@ export default function LoginPage({
         <button
           onClick={onLogin}
           disabled={isLoggingIn}
-          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -58,7 +58,7 @@ export default function LoginPage({
         <div className="pt-4">
           <button
             onClick={onToggleLang}
-            className="text-sm text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1 mx-auto"
+            className="text-sm text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1 mx-auto cursor-pointer"
           >
             <Globe className="w-4 h-4" /> {lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
           </button>

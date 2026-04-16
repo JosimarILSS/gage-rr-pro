@@ -22,6 +22,32 @@ import { t } from '../translations';
 import type { UseGageRRWorkspaceResult } from '../hooks/useGageRRWorkspace';
 import type { Lang } from '../types/common';
 
+const PartTooltip = ({ active, payload, label, measLabel }: any) => {
+  if (!active || !payload?.length) return null;
+  const mean = payload.find((p: any) => p.dataKey === 'mean');
+  const vals = payload.filter((p: any) => p.dataKey?.startsWith('val_') && p.value != null);
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm min-w-[160px]">
+      <p className="font-semibold text-slate-800 mb-2">{label}</p>
+      {mean && <p className="text-indigo-600 font-medium mb-1">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
+      {vals.map((v: any, i: number) => (
+        <p key={i} className="text-slate-500">{`${measLabel} ${i + 1} : ${Number(v.value).toFixed(2)}`}</p>
+      ))}
+    </div>
+  );
+};
+
+const OpTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const mean = payload.find((p: any) => p.dataKey === 'mean');
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm min-w-[140px]">
+      <p className="font-semibold text-slate-800 mb-1">{label}</p>
+      {mean && <p className="text-slate-600">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
+    </div>
+  );
+};
+
 const CrossedCircle = (props: any) => {
   const { cx, cy, stroke, fill } = props;
   if (cx === undefined || cy === undefined) return null;
@@ -183,9 +209,9 @@ export default function AnalysisPage({
               <BarChart3 className="text-indigo-600" />
               {t[lang].title}
             </h1>
-            <button 
+            <button
               onClick={onToggleLang}
-              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 px-2 py-1 rounded-md"
+              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 px-2 py-1 rounded-md cursor-pointer"
             >
               <Globe className="w-3 h-3" />
               {lang === 'es' ? 'EN' : 'ES'}
@@ -227,7 +253,7 @@ export default function AnalysisPage({
             disabled={!fileName}
             className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
               disabled:opacity-40 disabled:cursor-not-allowed
-              enabled:bg-red-50 enabled:border enabled:border-red-200 enabled:text-red-600 enabled:hover:bg-red-100"
+              enabled:cursor-pointer enabled:bg-red-50 enabled:border enabled:border-red-200 enabled:text-red-600 enabled:hover:bg-red-100"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             {lang === 'es' ? 'Reiniciar datos ingresados y análisis generado' : 'Reset entered data and generated analysis'}
@@ -238,7 +264,7 @@ export default function AnalysisPage({
             disabled={!results || isExportingPDF}
             className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
               disabled:opacity-40 disabled:cursor-not-allowed
-              enabled:bg-indigo-50 enabled:border enabled:border-indigo-200 enabled:text-indigo-600 enabled:hover:bg-indigo-100"
+              enabled:cursor-pointer enabled:bg-indigo-50 enabled:border enabled:border-indigo-200 enabled:text-indigo-600 enabled:hover:bg-indigo-100"
           >
             <FileDown className="w-3.5 h-3.5" />
             {isExportingPDF
@@ -252,7 +278,7 @@ export default function AnalysisPage({
             <div className="text-sm text-slate-600 truncate pr-2" title={userEmail || ''}>
               {userEmail}
             </div>
-            <button onClick={onLogout} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 shrink-0 transition-colors">
+            <button onClick={onLogout} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 shrink-0 transition-colors cursor-pointer">
               <LogOut className="w-4 h-4" />
               {t[lang].logout}
             </button>
@@ -297,19 +323,19 @@ export default function AnalysisPage({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].partCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={partCol} onChange={e => {setPartCol(e.target.value); setShowResults(false);}}>
+                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={partCol} onChange={e => {setPartCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].opCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={opCol} onChange={e => {setOpCol(e.target.value); setShowResults(false);}}>
+                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={opCol} onChange={e => {setOpCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].measCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={measCol} onChange={e => {setMeasCol(e.target.value); setShowResults(false);}}>
+                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={measCol} onChange={e => {setMeasCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
@@ -326,14 +352,14 @@ export default function AnalysisPage({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].multiplier}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={sigmaMultiplier} onChange={e => {setSigmaMultiplier(Number(e.target.value)); setShowResults(false);}}>
+                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={sigmaMultiplier} onChange={e => {setSigmaMultiplier(Number(e.target.value)); setShowResults(false);}}>
                     <option value={6}>{t[lang].mult6}</option>
                     <option value={5.15}>{t[lang].mult515}</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].interaction}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={includeInteraction ? 'true' : 'false'} onChange={e => {setIncludeInteraction(e.target.value === 'true'); setShowResults(false);}}>
+                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={includeInteraction ? 'true' : 'false'} onChange={e => {setIncludeInteraction(e.target.value === 'true'); setShowResults(false);}}>
                     <option value="true">{t[lang].inclInteraction}</option>
                     <option value="false">{t[lang].omitInteraction}</option>
                   </select>
@@ -374,7 +400,7 @@ export default function AnalysisPage({
                     
                     <button
                       onClick={() => { setShowResults(true); setTimeout(() => scrollTo(section4Ref), 100); }}
-                      className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2"
+                      className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <BarChart3 className="w-4 h-4" />
                       {t[lang].calcBtn}
@@ -567,7 +593,7 @@ export default function AnalysisPage({
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="part" tick={{ fill: '#475569', fontSize: 12 }} />
                             <YAxis domain={['auto', 'auto']} tick={{ fill: '#475569', fontSize: 12 }} />
-                            <Tooltip contentStyle={{ borderRadius: '0.5rem' }} />
+                            <Tooltip content={<PartTooltip measLabel={measCol || t[lang].measurement} />} />
                             {Array.from({ length: results.maxValsPerPart }).map((_, i) => (
                               <Scatter key={i} dataKey={`val_${i}`} fill="#94a3b8" name={`${t[lang].measurement} ${i+1}`} />
                             ))}
@@ -584,7 +610,7 @@ export default function AnalysisPage({
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="op" tick={{ fill: '#475569', fontSize: 12 }} />
                             <YAxis domain={['auto', 'auto']} tick={{ fill: '#475569', fontSize: 12 }} />
-                            <Tooltip contentStyle={{ borderRadius: '0.5rem' }} />
+                            <Tooltip content={<OpTooltip />} />
                             <Scatter dataKey="median" name={t[lang].median} fill="transparent" stroke="transparent">
                               <ErrorBar dataKey="whisker" width={8} strokeWidth={1.5} stroke="#475569" direction="y" />
                             </Scatter>

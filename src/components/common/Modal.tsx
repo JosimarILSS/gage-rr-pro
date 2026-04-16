@@ -16,7 +16,7 @@ export default function Modal({ isOpen, title, children, onClose }: ModalProps) 
         type="button"
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/50"
+        className="absolute inset-0 bg-slate-900/50 cursor-pointer"
       />
       <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200">
         <div className="p-5 border-b border-slate-200 flex items-center justify-between">
@@ -24,7 +24,7 @@ export default function Modal({ isOpen, title, children, onClose }: ModalProps) 
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-700 text-sm font-medium"
+            className="text-slate-500 hover:text-slate-700 text-sm font-medium cursor-pointer"
           >
             Cerrar
           </button>
