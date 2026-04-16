@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { AlertCircle, BarChart3, CheckCircle2, FileSpreadsheet, Globe, Info, LogOut, Settings, Upload, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertCircle, BarChart3, CheckCircle2, FileSpreadsheet, FileDown, Globe, Info, LogOut, RotateCcw, Settings, Upload, Users } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -60,6 +60,7 @@ export default function AnalysisPage({
   const {
     problemDesc,
     setProblemDesc,
+    fileName,
     data,
     columns,
     partCol,
@@ -79,15 +80,86 @@ export default function AnalysisPage({
     showResults,
     setShowResults,
     handleFileUpload,
+    resetWorkspace,
     validation,
     results,
   } = workspace;
 
   const section4Ref = useRef<HTMLDivElement>(null);
   const section5Ref = useRef<HTMLDivElement>(null);
+  const mainPanelRef = useRef<HTMLDivElement>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleExportPDF = async () => {
+    const el = mainPanelRef.current;
+    if (!el || isExportingPDF) return;
+
+    setIsExportingPDF(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const { default: jsPDF } = await import('jspdf');
+
+      // Guardar scroll actual y desplazar al inicio para capturar todo
+      const prevScroll = el.scrollTop;
+      el.scrollTop = 0;
+
+      // Pequeña pausa para que los charts terminen de renderizar
+      await new Promise((r) => setTimeout(r, 300));
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+      });
+
+      // Restaurar scroll
+      el.scrollTop = prevScroll;
+
+      const imgData = canvas.toDataURL('image/png');
+      const pageWidth = 210; // A4 mm
+      const pageHeight = 297;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      let yOffset = 0;
+      let remaining = imgHeight;
+
+      while (remaining > 0) {
+        const sliceHeight = Math.min(pageHeight, remaining);
+        const srcY = ((imgHeight - remaining) / imgHeight) * canvas.height;
+        const srcH = (sliceHeight / imgHeight) * canvas.height;
+
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = srcH;
+        const ctx = sliceCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, sliceHeight);
+
+        remaining -= sliceHeight;
+        yOffset += sliceHeight;
+      }
+
+      const baseName = fileName ? fileName.replace(/\.[^.]+$/, '') : 'gage-rr';
+      pdf.save(`${baseName}-resultado.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   // Al volver de Stripe con checkout=success, hacer scroll a sección 5
@@ -102,6 +174,7 @@ export default function AnalysisPage({
 
   return (
     <SidebarLayout
+      mainRef={mainPanelRef}
       sidebar={
         <>
         <div>
@@ -131,16 +204,47 @@ export default function AnalysisPage({
           />
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{t[lang].loadData}</h2>
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <Upload className="w-8 h-8 text-slate-400 mb-2" />
+              <Upload className="w-7 h-7 text-slate-400 mb-2" />
               <p className="text-sm text-slate-600"><span className="font-semibold">{t[lang].uploadPrompt}</span></p>
               <p className="text-xs text-slate-500">{t[lang].dragDrop}</p>
             </div>
             <input type="file" className="hidden" accept=".csv, .xlsx" onChange={handleFileUpload} />
           </label>
+
+          {fileName && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <FileSpreadsheet className="w-4 h-4 text-indigo-500 shrink-0" />
+              <span className="text-xs text-indigo-700 font-medium truncate flex-1" title={fileName}>{fileName}</span>
+            </div>
+          )}
+
+          <button
+            onClick={resetWorkspace}
+            disabled={!fileName}
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
+              disabled:opacity-40 disabled:cursor-not-allowed
+              enabled:bg-red-50 enabled:border enabled:border-red-200 enabled:text-red-600 enabled:hover:bg-red-100"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {lang === 'es' ? 'Reiniciar datos ingresados y análisis generado' : 'Reset entered data and generated analysis'}
+          </button>
+
+          <button
+            onClick={handleExportPDF}
+            disabled={!results || isExportingPDF}
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
+              disabled:opacity-40 disabled:cursor-not-allowed
+              enabled:bg-indigo-50 enabled:border enabled:border-indigo-200 enabled:text-indigo-600 enabled:hover:bg-indigo-100"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            {isExportingPDF
+              ? (lang === 'es' ? 'Generando PDF...' : 'Generating PDF...')
+              : (lang === 'es' ? 'Generar PDF de los resultados' : 'Generate PDF of results')}
+          </button>
         </div>
 
         <div className="mt-auto pt-6 border-t border-slate-200">

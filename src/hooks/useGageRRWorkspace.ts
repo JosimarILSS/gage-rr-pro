@@ -7,6 +7,7 @@ const SESSION_KEY = 'gagerr_workspace';
 
 type PersistedWorkspace = {
   problemDesc: string;
+  fileName: string;
   data: DataRow[];
   columns: string[];
   partCol: string;
@@ -39,6 +40,7 @@ const saveToSession = (state: PersistedWorkspace) => {
 type UseGageRRWorkspaceResult = {
   problemDesc: string;
   setProblemDesc: (value: string) => void;
+  fileName: string;
   data: DataRow[];
   columns: string[];
   partCol: string;
@@ -58,6 +60,7 @@ type UseGageRRWorkspaceResult = {
   showResults: boolean;
   setShowResults: (value: boolean) => void;
   handleFileUpload: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  resetWorkspace: () => void;
   validation: ValidationResult | null;
   results: any | null;
 };
@@ -66,6 +69,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
   const saved = useMemo(() => loadFromSession(), []);
 
   const [problemDesc, setProblemDescRaw] = useState(saved.problemDesc ?? '');
+  const [fileName, setFileNameRaw] = useState(saved.fileName ?? '');
   const [data, setDataRaw] = useState<DataRow[]>(saved.data ?? []);
   const [columns, setColumnsRaw] = useState<string[]>(saved.columns ?? []);
   const [partCol, setPartColRaw] = useState(saved.partCol ?? '');
@@ -81,6 +85,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
   const persist = (patch: Partial<PersistedWorkspace>) => {
     saveToSession({
       problemDesc,
+      fileName,
       data,
       columns,
       partCol,
@@ -117,6 +122,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
       const newOpCol = parsed.columns[1] || '';
       const newMeasCol = parsed.columns[2] || '';
 
+      setFileNameRaw(file.name);
       setDataRaw(parsed.data);
       setColumnsRaw(parsed.columns);
       setPartColRaw(newPartCol);
@@ -124,6 +130,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
       setMeasColRaw(newMeasCol);
 
       persist({
+        fileName: file.name,
         data: parsed.data,
         columns: parsed.columns,
         partCol: newPartCol,
@@ -134,6 +141,22 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
     } catch (error) {
       console.error('Error parsing uploaded file:', error);
     }
+  };
+
+  const resetWorkspace = () => {
+    setProblemDescRaw('');
+    setFileNameRaw('');
+    setDataRaw([]);
+    setColumnsRaw([]);
+    setPartColRaw('');
+    setOpColRaw('');
+    setMeasColRaw('');
+    setLieRaw('');
+    setLseRaw('');
+    setSigmaMultiplierRaw(6);
+    setIncludeInteractionRaw(true);
+    setShowResultsRaw(false);
+    sessionStorage.removeItem(SESSION_KEY);
   };
 
   const validation = useMemo<ValidationResult | null>(() => {
@@ -244,6 +267,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
   return {
     problemDesc,
     setProblemDesc,
+    fileName,
     data,
     columns,
     partCol,
@@ -263,6 +287,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
     showResults,
     setShowResults,
     handleFileUpload,
+    resetWorkspace,
     validation,
     results,
   };
