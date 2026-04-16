@@ -125,32 +125,39 @@ export default function AnalysisPage({
     if (!el || isExportingPDF) return;
 
     setIsExportingPDF(true);
+
+    // Guardar estado original del contenedor
+    const prevOverflow = el.style.overflow;
+    const prevHeight = el.style.height;
+    const prevScroll = el.scrollTop;
+
     try {
       const { default: html2canvas } = await import('html2canvas');
       const { default: jsPDF } = await import('jspdf');
 
-      // Guardar scroll actual y desplazar al inicio para capturar todo
-      const prevScroll = el.scrollTop;
+      // Expandir el contenedor para que html2canvas vea TODO el contenido
+      el.style.overflow = 'visible';
+      el.style.height = 'auto';
       el.scrollTop = 0;
 
-      // Pequeña pausa para que los charts terminen de renderizar
-      await new Promise((r) => setTimeout(r, 300));
+      // Pausa para que Recharts re-renderice los SVG en el nuevo tamaño
+      await new Promise((r) => setTimeout(r, 400));
+
+      const fullWidth = el.scrollWidth;
+      const fullHeight = el.scrollHeight;
 
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
+        logging: false,
+        width: fullWidth,
+        height: fullHeight,
+        windowWidth: fullWidth,
+        windowHeight: fullHeight,
+        x: 0,
+        y: 0,
       });
 
-      // Restaurar scroll
-      el.scrollTop = prevScroll;
-
-      const imgData = canvas.toDataURL('image/png');
       const pageWidth = 210; // A4 mm
       const pageHeight = 297;
       const imgWidth = pageWidth;
@@ -158,25 +165,26 @@ export default function AnalysisPage({
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      let yOffset = 0;
       let remaining = imgHeight;
+      let srcYPx = 0;
+      let firstPage = true;
 
       while (remaining > 0) {
-        const sliceHeight = Math.min(pageHeight, remaining);
-        const srcY = ((imgHeight - remaining) / imgHeight) * canvas.height;
-        const srcH = (sliceHeight / imgHeight) * canvas.height;
+        const sliceHeightMm = Math.min(pageHeight, remaining);
+        const sliceHeightPx = (sliceHeightMm / imgHeight) * canvas.height;
 
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = canvas.width;
-        sliceCanvas.height = srcH;
+        sliceCanvas.height = Math.round(sliceHeightPx);
         const ctx = sliceCanvas.getContext('2d')!;
-        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+        ctx.drawImage(canvas, 0, srcYPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
 
-        if (yOffset > 0) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, sliceHeight);
+        if (!firstPage) pdf.addPage();
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, sliceHeightMm);
 
-        remaining -= sliceHeight;
-        yOffset += sliceHeight;
+        remaining -= sliceHeightMm;
+        srcYPx += sliceHeightPx;
+        firstPage = false;
       }
 
       const baseName = fileName ? fileName.replace(/\.[^.]+$/, '') : 'gage-rr';
@@ -184,6 +192,10 @@ export default function AnalysisPage({
     } catch (err) {
       console.error('Error generating PDF:', err);
     } finally {
+      // Restaurar el contenedor siempre, incluso si hubo error
+      el.style.overflow = prevOverflow;
+      el.style.height = prevHeight;
+      el.scrollTop = prevScroll;
       setIsExportingPDF(false);
     }
   };
