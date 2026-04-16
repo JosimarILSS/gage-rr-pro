@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, BarChart3, CheckCircle2, FileSpreadsheet, FileDown, Globe, Info, LogOut, RotateCcw, Settings, Upload, Users } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, FileDown, FileSpreadsheet, Globe, Info, LogOut, RotateCcw, Settings, Upload, Users } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -120,85 +120,56 @@ export default function AnalysisPage({
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = () => {
     const el = mainPanelRef.current;
     if (!el || isExportingPDF) return;
 
     setIsExportingPDF(true);
 
-    let clone: HTMLElement | null = null;
+    const style = document.createElement('style');
+    style.id = 'pdf-print-style';
+    style.textContent = `
+      @media print {
+        body > * { display: none !important; }
+        #pdf-print-root { display: block !important; }
 
-    try {
-      const { default: html2canvas } = await import('html2canvas');
-      const { default: jsPDF } = await import('jspdf');
+        #pdf-print-root {
+          position: fixed;
+          inset: 0;
+          overflow: visible;
+          background: white;
+          padding: 24px;
+          box-sizing: border-box;
+        }
 
-      const fullWidth = el.scrollWidth;
-      const fullHeight = el.scrollHeight;
+        #pdf-print-root * {
+          overflow: visible !important;
+          max-height: none !important;
+        }
 
-      // Clonar en un div temporal fuera del viewport, sin restricciones de overflow
-      clone = el.cloneNode(true) as HTMLElement;
-      clone.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: -9999px;
-        width: ${fullWidth}px;
-        height: ${fullHeight}px;
-        overflow: visible;
-        z-index: -1;
-        background: white;
-      `;
-      document.body.appendChild(clone);
-
-      // Pausa para que el DOM se pinte
-      await new Promise((r) => setTimeout(r, 300));
-
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        width: fullWidth,
-        height: fullHeight,
-        windowWidth: fullWidth,
-        windowHeight: fullHeight,
-      });
-
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      let remaining = imgHeight;
-      let srcYPx = 0;
-      let firstPage = true;
-
-      while (remaining > 0) {
-        const sliceHeightMm = Math.min(pageHeight, remaining);
-        const sliceHeightPx = (sliceHeightMm / imgHeight) * canvas.height;
-
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = Math.round(sliceHeightPx);
-        const ctx = sliceCanvas.getContext('2d')!;
-        ctx.drawImage(canvas, 0, srcYPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-
-        if (!firstPage) pdf.addPage();
-        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, sliceHeightMm);
-
-        remaining -= sliceHeightMm;
-        srcYPx += sliceHeightPx;
-        firstPage = false;
+        @page { margin: 10mm; size: A4 portrait; }
       }
+    `;
+    document.head.appendChild(style);
 
-      const baseName = fileName ? fileName.replace(/\.[^.]+$/, '') : 'gage-rr';
-      pdf.save(`${baseName}-resultado.pdf`);
-    } catch (err) {
-      console.error('[PDF] Error generating PDF:', err);
-    } finally {
-      if (clone && document.body.contains(clone)) document.body.removeChild(clone);
+    // Envolver el contenido en un div con id conocido
+    const wrapper = document.createElement('div');
+    wrapper.id = 'pdf-print-root';
+    wrapper.style.display = 'none';
+    wrapper.appendChild(el.cloneNode(true));
+    document.body.appendChild(wrapper);
+
+    const cleanup = () => {
+      document.head.removeChild(style);
+      document.body.removeChild(wrapper);
       setIsExportingPDF(false);
-    }
+    };
+
+    // Escuchar afterprint para limpiar
+    window.addEventListener('afterprint', cleanup, { once: true });
+
+    // Pequeña pausa para que el DOM esté listo
+    setTimeout(() => window.print(), 200);
   };
 
   // Al volver de Stripe con checkout=success, hacer scroll a sección 5
