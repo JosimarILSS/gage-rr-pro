@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, BarChart3, CheckCircle2, FileDown, FileSpreadsheet, Globe, Info, LogOut, RotateCcw, Settings, Upload, Users } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, FileDown, FileSpreadsheet, Globe, Info, LogOut, RotateCcw, Settings, ShieldCheck, Upload, Users } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -70,6 +70,8 @@ type AnalysisPageProps = {
   checkoutError: string | null;
   onUnlockPremium: () => Promise<void>;
   workspace: UseGageRRWorkspaceResult;
+  showAdminAccessButton?: boolean;
+  onGoToAdminAccess?: () => void;
 };
 
 export default function AnalysisPage({
@@ -82,6 +84,8 @@ export default function AnalysisPage({
   checkoutError,
   onUnlockPremium,
   workspace,
+  showAdminAccessButton = false,
+  onGoToAdminAccess,
 }: AnalysisPageProps) {
   const {
     problemDesc,
@@ -147,6 +151,7 @@ export default function AnalysisPage({
   return (
     <SidebarLayout
       mainRef={mainPanelRef}
+      mobileSidebarCollapsed={data.length > 0}
       sidebar={
         <>
         <div>
@@ -219,7 +224,17 @@ export default function AnalysisPage({
           </button>
         </div>
 
-        <div id="print-logout-hide" className="mt-auto pt-6 border-t border-slate-200">
+        <div id="print-logout-hide" className="mt-auto pt-6 border-t border-slate-200 space-y-3">
+          {showAdminAccessButton && onGoToAdminAccess && (
+            <button
+              type="button"
+              onClick={onGoToAdminAccess}
+              className="w-full flex items-center justify-center gap-2 text-xs font-medium bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              {lang === 'es' ? 'Acceso a administración de usuarios' : 'User Admin Access'}
+            </button>
+          )}
           <div className="flex items-center justify-between">
             <div className="text-sm text-slate-600 truncate pr-2" title={userEmail || ''}>
               {userEmail}
@@ -714,4 +729,3 @@ export default function AnalysisPage({
     </SidebarLayout>
   );
 }
-

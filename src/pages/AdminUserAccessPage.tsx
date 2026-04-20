@@ -1,14 +1,15 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { LogOut, ShieldCheck } from 'lucide-react';
+import { Home, LogOut, ShieldCheck } from 'lucide-react';
 import { manageUserAccess, type ManageUserAccessResult } from '../services/admin-user';
 import { auth } from '../firebase';
 
 type AdminUserAccessPageProps = {
   adminEmail: string;
   onLogout: () => Promise<void>;
+  onBackHome: () => void;
 };
 
-export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserAccessPageProps) {
+export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }: AdminUserAccessPageProps) {
   const [email, setEmail] = useState('');
   const [premium, setPremium] = useState(true);
   const [unlimited, setUnlimited] = useState(false);
@@ -88,13 +89,23 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
             <h1 className="text-2xl font-bold text-slate-800 mt-3">Admin User Access</h1>
             <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
           </div>
-          <button
-            onClick={onLogout}
-            className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={onBackHome}
+              className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              <Home className="w-4 h-4" />
+              Inicio
+            </button>
+            <button
+              onClick={onLogout}
+              className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">

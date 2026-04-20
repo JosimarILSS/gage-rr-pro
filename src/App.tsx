@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthSession } from './hooks/useAuthSession';
 import { useGageRRWorkspace } from './hooks/useGageRRWorkspace';
 import LoadingPage from './pages/LoadingPage';
@@ -9,16 +9,37 @@ import AdminUserAccessPage from './pages/AdminUserAccessPage';
 import type { Lang } from './types/common';
 
 const ADMIN_ROUTE = '/admin_user_access';
-const ADMIN_EMAIL = 'j.diaz@ilssg.org';
+
+const parseAllowedAdminEmails = (rawValue?: string): string[] =>
+  (rawValue || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('es');
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const authSession = useAuthSession(lang);
   const workspace = useGageRRWorkspace(lang);
+  const allowedAdminEmails = useMemo(
+    () => parseAllowedAdminEmails(import.meta.env.VITE_ADMIN_ALLOWED_EMAILS || 'j.diaz@ilssg.org'),
+    []
+  );
 
   const toggleLang = () => setLang((current) => (current === 'es' ? 'en' : 'es'));
   const isAdminRoute = pathname === ADMIN_ROUTE;
+  const loggedEmail = (authSession.user?.email || '').toLowerCase();
+  const canSeeAdminEntry =
+    allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
+
+  const navigateTo = (path: string, replace = false) => {
+    if (replace) {
+      window.history.replaceState({}, '', path);
+    } else {
+      window.history.pushState({}, '', path);
+    }
+    setPathname(path);
+  };
 
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname);
@@ -27,8 +48,7 @@ export default function App() {
   }, []);
 
   const isAuthorizedAdminUser =
-    (authSession.user?.email || '').toLowerCase() === ADMIN_EMAIL &&
-    authSession.user?.providerData?.some((provider) => provider.providerId === 'google.com');
+    allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
 
   useEffect(() => {
     if (!isAdminRoute) return;
@@ -36,8 +56,7 @@ export default function App() {
     if (!authSession.user) return;
     if (isAuthorizedAdminUser) return;
 
-    window.history.replaceState({}, '', '/');
-    setPathname('/');
+    navigateTo('/', true);
   }, [isAdminRoute, authSession.loadingAuth, authSession.user, isAuthorizedAdminUser]);
 
   if (authSession.loadingAuth) {
@@ -52,6 +71,7 @@ export default function App() {
           isAuthLoading={authSession.isAuthLoading}
           authError={authSession.authError}
           onGoogleLogin={authSession.handleLoginWithGoogle}
+          onBackHome={() => navigateTo('/')}
         />
       );
     }
@@ -62,8 +82,9 @@ export default function App() {
 
     return (
       <AdminUserAccessPage
-        adminEmail={authSession.user.email || ADMIN_EMAIL}
+        adminEmail={authSession.user.email || ''}
         onLogout={authSession.handleLogout}
+        onBackHome={() => navigateTo('/')}
       />
     );
   }
@@ -93,6 +114,8 @@ export default function App() {
       checkoutError={authSession.checkoutError}
       onUnlockPremium={authSession.handleUnlockPremium}
       workspace={workspace}
+      showAdminAccessButton={canSeeAdminEntry}
+      onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
     />
   );
 }

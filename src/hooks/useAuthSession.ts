@@ -25,6 +25,7 @@ import type { Lang } from '../types/common';
 
 type UseAuthSessionResult = {
   user: User | null;
+  signInProvider: string | null;
   loadingAuth: boolean;
   esPremium: boolean;
   authError: string | null;
@@ -45,6 +46,7 @@ type PendingGoogleLink = {
 
 export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const [user, setUser] = useState<User | null>(null);
+  const [signInProvider, setSignInProvider] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [esPremium, setEsPremium] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -62,19 +64,31 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setLoadingAuth(false);
 
-      if (currentUser) {
-        // Registrar en Firestore si es la primera vez (el endpoint ignora si ya existe)
-        try {
-          const token = await currentUser.getIdToken();
-          await fetch(`${apiBaseUrl}/api/user/register`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch {
-          // Silencioso para no exponer detalles internos al cliente.
-        }
+      if (!currentUser) {
+        setSignInProvider(null);
+        setLoadingAuth(false);
+        return;
+      }
+
+      try {
+        const tokenResult = await currentUser.getIdTokenResult();
+        setSignInProvider(tokenResult.signInProvider || null);
+      } catch {
+        setSignInProvider(null);
+      } finally {
+        setLoadingAuth(false);
+      }
+
+      // Registrar en Firestore si es la primera vez (el endpoint ignora si ya existe)
+      try {
+        const token = await currentUser.getIdToken();
+        await fetch(`${apiBaseUrl}/api/user/register`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // Silencioso para no exponer detalles internos al cliente.
       }
     });
 
@@ -362,6 +376,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
   return {
     user,
+    signInProvider,
     loadingAuth,
     esPremium,
     authError,

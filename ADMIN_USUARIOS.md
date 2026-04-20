@@ -14,8 +14,10 @@ Guía de referencia para gestionar usuarios en Firebase desde la terminal.
 También puedes usar la interfaz web oculta:
 
 - URL: `/admin_user_access`
-- Acceso permitido solo para `j.diaz@ilssg.org`
-- Debe iniciar sesión con Google para ejecutar cambios
+- Los correos con acceso se definen por variables de entorno (sin espacios, separados por comas):
+  `VITE_ADMIN_ALLOWED_EMAILS` (frontend) y `ADMIN_ALLOWED_EMAILS` (backend)
+  Ejemplo: `correo1@dominio.com,correo2@dominio.com`
+- Debe iniciar sesión con Google para detectar y permitir acceso admin
 - Si entra otro usuario, la app lo redirige a `/`
 
 ### Registrar usuario nuevo sin premium

@@ -4,7 +4,15 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
 
-const ADMIN_EMAIL = 'j.diaz@ilssg.org';
+const parseAllowedAdminEmails = (rawValue) =>
+  (rawValue || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+const ADMIN_ALLOWED_EMAILS = parseAllowedAdminEmails(
+  process.env.ADMIN_ALLOWED_EMAILS || 'j.diaz@ilssg.org'
+);
 
 const addMonths = (date, amount) => {
   const next = new Date(date);
@@ -35,7 +43,8 @@ module.exports = async function handler(req, res) {
   const requesterEmail = (decodedToken.email || '').toLowerCase();
   const provider = decodedToken.firebase?.sign_in_provider || '';
 
-  if (requesterEmail !== ADMIN_EMAIL || provider !== 'google.com') {
+  const isAllowedAdminEmail = ADMIN_ALLOWED_EMAILS.includes(requesterEmail);
+  if (!isAllowedAdminEmail || provider !== 'google.com') {
     res.status(403).json({ error: 'Forbidden. Admin access requires Google sign-in with authorized email.' });
     return;
   }

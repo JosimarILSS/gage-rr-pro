@@ -1,4 +1,4 @@
-import { Shield, LogIn } from 'lucide-react';
+import { Shield, LogIn, Home } from 'lucide-react';
 import type { Lang } from '../types/common';
 
 type AdminAccessGatePageProps = {
@@ -6,6 +6,7 @@ type AdminAccessGatePageProps = {
   isAuthLoading: boolean;
   authError: string | null;
   onGoogleLogin: () => Promise<void>;
+  onBackHome: () => void;
 };
 
 export default function AdminAccessGatePage({
@@ -13,6 +14,7 @@ export default function AdminAccessGatePage({
   isAuthLoading,
   authError,
   onGoogleLogin,
+  onBackHome,
 }: AdminAccessGatePageProps) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
@@ -26,6 +28,14 @@ export default function AdminAccessGatePage({
             ? 'Esta pagina requiere iniciar sesion con Google usando el correo autorizado.'
             : 'This page requires Google sign-in with the authorized email.'}
         </p>
+        <button
+          type="button"
+          onClick={onBackHome}
+          className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-4 rounded-xl transition-colors cursor-pointer"
+        >
+          <Home className="w-4 h-4" />
+          {lang === 'es' ? 'Regresar al inicio' : 'Back to home'}
+        </button>
         <button
           onClick={onGoogleLogin}
           disabled={isAuthLoading}
