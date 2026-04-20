@@ -24,6 +24,18 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
     []
   );
 
+  const handleMonthsChange = (rawValue: string) => {
+    const onlyDigits = rawValue.replace(/\D/g, '');
+    if (!onlyDigits) {
+      setMonths(1);
+      return;
+    }
+
+    const normalized = onlyDigits.replace(/^0+/, '');
+    const parsed = Number(normalized || '0');
+    setMonths(parsed > 0 ? parsed : 1);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -150,7 +162,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
                     min={1}
                     step={1}
                     value={months}
-                    onChange={(e) => setMonths(Number(e.target.value))}
+                    onChange={(e) => handleMonthsChange(e.target.value)}
                     className="w-full md:w-48 border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     required
                   />
