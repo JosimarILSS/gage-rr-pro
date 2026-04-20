@@ -40,7 +40,7 @@ export default function PremiumUnlockCard({
       footer: 'One-time lifetime access • Secure Stripe payment',
       modalTitle: 'Confirm Purchase',
       modalBody:
-        'You are about to open Stripe Checkout for 150 MXN. Once paid, your Firebase account will be marked as premium automatically.',
+        'You are about to open Stripe Checkout for 150 MXN. Once paid, your account will be marked as premium automatically.',
       modalCancel: 'Cancel',
       modalConfirm: 'Continue to payment',
     },
