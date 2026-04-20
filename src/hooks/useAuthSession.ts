@@ -244,7 +244,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     let signInMethods: string[] = [];
     const genericEmailLoginHint =
       lang === 'es'
-        ? 'No se pudo ingresar, el correo y la contraseña son incorrectos o anteriormente se ha iniciado sesión con Google con este mismo correo, si es así, favor de dar click en "Iniciar sesión con Google" y el mismo correo con el cual quieres ingresar.'
+        ? 'No se pudo ingresar, el correo o la contraseña son incorrectos o anteriormente se ha iniciado sesión con Google con este mismo correo, si es así, favor de dar click en "Iniciar sesión con Google" y el mismo correo con el cual quieres ingresar.'
         : 'Could not sign in. The email or password is incorrect, or this email has previously used Google sign-in. If so, click "Sign in with Google" and choose the same email.';
     setIsAuthLoading(true);
     setAuthError(null);
