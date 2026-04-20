@@ -27,7 +27,7 @@ export default function PremiumUnlockCard({
       footer: 'Acceso único de por vida • Pago seguro vía Stripe',
       modalTitle: 'Confirmar Compra',
       modalBody:
-        'Vas a abrir Stripe Checkout para pagar 150 MXN. Al confirmar el pago, tu cuenta de Firebase se marcará como premium automáticamente.',
+        'Vas a abrir Stripe Checkout para pagar 150 MXN. Al confirmar el pago, tu cuenta se marcará como premium automáticamente.',
       modalCancel: 'Cancelar',
       modalConfirm: 'Continuar a pago',
     },
