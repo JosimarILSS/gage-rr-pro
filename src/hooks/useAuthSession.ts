@@ -243,11 +243,16 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     if (isAuthLoading) return;
 
     const normalizedEmail = email.trim().toLowerCase();
+    let signInMethods: string[] = [];
     setIsAuthLoading(true);
     setAuthError(null);
 
     try {
-      const signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+      signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+      console.log('[auth] fetchSignInMethodsForEmail:', {
+        email: normalizedEmail,
+        methods: signInMethods,
+      });
       const googleEnabled = signInMethods.includes('google.com');
       const passwordEnabled = signInMethods.includes('password');
 
@@ -265,6 +270,36 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       clearPendingGoogleLinkIfUnmatched(normalizedEmail);
     } catch (error: any) {
       const code = error?.code as string | undefined;
+      console.error('[auth] email login failed:', {
+        email: normalizedEmail,
+        code,
+        message: error?.message,
+        methodsDetected: signInMethods,
+      });
+
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        const googleEnabled = signInMethods.includes('google.com');
+        const passwordEnabled = signInMethods.includes('password');
+
+        if (googleEnabled && !passwordEnabled) {
+          setAuthError(
+            lang === 'es'
+              ? 'Con este correo se inicio sesion con el metodo de Google, favor de iniciar sesion dando click a "Iniciar sesion con Google" y elegir el correo ingresado.'
+              : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.'
+          );
+          return;
+        }
+
+        if (signInMethods.length === 0) {
+          setAuthError(
+            lang === 'es'
+              ? 'No se pudo iniciar con correo. Si este correo fue registrado con Google, da click en "Iniciar sesion con Google" y elige el mismo correo.'
+              : 'Email sign-in failed. If this email was registered with Google, click "Sign in with Google" and choose the same email.'
+          );
+          return;
+        }
+      }
+
       setAuthError(getAuthErrorMessage(code, lang, error?.message));
     } finally {
       setIsAuthLoading(false);
