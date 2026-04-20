@@ -12,7 +12,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
   const [email, setEmail] = useState('');
   const [premium, setPremium] = useState(true);
   const [unlimited, setUnlimited] = useState(false);
-  const [months, setMonths] = useState(6);
+  const [monthsInput, setMonthsInput] = useState('6');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ManageUserAccessResult | null>(null);
@@ -27,13 +27,13 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
   const handleMonthsChange = (rawValue: string) => {
     const onlyDigits = rawValue.replace(/\D/g, '');
     if (!onlyDigits) {
-      setMonths(1);
+      setMonthsInput('');
       return;
     }
 
-    const normalized = onlyDigits.replace(/^0+/, '');
-    const parsed = Number(normalized || '0');
-    setMonths(parsed > 0 ? parsed : 1);
+    // Permite "0", pero elimina ceros a la izquierda cuando hay más dígitos (015 -> 15).
+    const normalized = onlyDigits.replace(/^0+(?=\d)/, '');
+    setMonthsInput(normalized);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -45,6 +45,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
       return;
     }
 
+    const months = Number(monthsInput);
     if (premium && !unlimited && (!Number.isInteger(months) || months <= 0)) {
       setError('Meses debe ser un entero mayor a 0.');
       return;
@@ -161,7 +162,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout }: AdminUserA
                     type="number"
                     min={1}
                     step={1}
-                    value={months}
+                    value={monthsInput}
                     onChange={(e) => handleMonthsChange(e.target.value)}
                     className="w-full md:w-48 border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     required
