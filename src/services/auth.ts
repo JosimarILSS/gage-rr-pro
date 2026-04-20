@@ -54,7 +54,7 @@ export const getAuthErrorMessage = (
       invalidApiKey:
         'La API key de Firebase Web no es valida. Actualiza `VITE_FIREBASE_API_KEY` en tu .env con la configuracion real del proyecto Firebase.',
       accountExistsDifferentCredential:
-        'Este correo ya existe con otro metodo de acceso. Inicia sesion con correo y contrasena para vincular Google automaticamente.',
+        'Este correo ya existe con otro metodo de acceso. Inicia sesion con correo y contraseña para vincular Google automaticamente.',
       unauthorizedDomain:
         "Dominio no autorizado en Firebase. Agrega el dominio actual (por ejemplo `localhost` o `0.0.0.0`) en Authentication > Settings > Authorized domains.",
       operationNotAllowed:
@@ -64,8 +64,8 @@ export const getAuthErrorMessage = (
       emailAlreadyInUse:
         'Ese correo ya esta registrado. Inicia sesion o usa Google con ese mismo correo.',
       invalidEmail: 'Correo invalido. Verifica el formato.',
-      invalidCredential: 'Credenciales invalidas. Revisa correo y contrasena.',
-      weakPassword: 'La contrasena debe tener al menos 6 caracteres.',
+      invalidCredential: 'Credenciales invalidas. Revisa correo y contraseña.',
+      weakPassword: 'La contraseña debe tener al menos 6 caracteres.',
       tooManyRequests:
         'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.',
       defaultError: 'No se pudo iniciar sesión con Google. Revisa la consola para más detalles.',

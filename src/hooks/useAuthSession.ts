@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
   linkWithCredential,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -10,6 +11,7 @@ import {
   signInWithRedirect,
   signOut,
   type AuthCredential,
+  type UserCredential,
   type User,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
@@ -139,12 +141,53 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       setPendingGoogleLink(null);
     } catch (error: any) {
       const code = error?.code as string | undefined;
-      if (code === 'auth/provider-already-linked' || code === 'auth/credential-already-in-use') {
+      if (code === 'auth/provider-already-linked') {
         setPendingGoogleLink(null);
+        return;
+      }
+      if (code === 'auth/credential-already-in-use') {
+        setPendingGoogleLink(null);
+        setAuthError(
+          lang === 'es'
+            ? 'Ya existe una cuenta de Google separada para este correo. Activa "One account per email address" en Firebase y elimina duplicados para vincular correctamente.'
+            : 'A separate Google account already exists for this email. Enable "One account per email address" in Firebase and remove duplicates to link correctly.'
+        );
         return;
       }
       console.error('Error linking Google provider:', error);
     }
+  };
+
+  const validateGoogleSignInResult = async (result: UserCredential): Promise<boolean> => {
+    const email = result.user.email?.trim().toLowerCase();
+    if (!email) return true;
+
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    const hasPasswordMethod = methods.includes('password');
+    const currentHasPasswordProvider = result.user.providerData.some(
+      (provider) => provider.providerId === 'password'
+    );
+
+    if (!hasPasswordMethod || currentHasPasswordProvider) {
+      setPendingGoogleLink(null);
+      return true;
+    }
+
+    const pendingCredential = GoogleAuthProvider.credentialFromResult(result);
+    if (pendingCredential) {
+      setPendingGoogleLink({
+        email,
+        credential: pendingCredential,
+      });
+    }
+
+    await signOut(auth);
+    setAuthError(
+      lang === 'es'
+        ? 'Este correo ya usa contraseña. Inicia sesión con correo y contraseña para vincular Google automáticamente.'
+        : 'This email already uses password sign-in. Sign in with email and password to link Google automatically.'
+    );
+    return false;
   };
 
   const handleLoginWithGoogle = async () => {
@@ -154,8 +197,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     setAuthError(null);
 
     try {
-      await signInWithPopup(auth, googleProvider);
-      setPendingGoogleLink(null);
+      const result = await signInWithPopup(auth, googleProvider);
+      await validateGoogleSignInResult(result);
     } catch (error: any) {
       const code = error?.code as string | undefined;
       console.error('Error logging in:', error);
@@ -224,7 +267,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     if (!normalizedEmail || !password || !confirmPassword) {
       setAuthError(
         lang === 'es'
-          ? 'Completa correo, contrasena y confirmacion de contrasena.'
+          ? 'Completa correo, contraseña y confirmacion de contraseña.'
           : 'Please complete email, password, and password confirmation.'
       );
       return;
@@ -233,7 +276,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     if (password !== confirmPassword) {
       setAuthError(
         lang === 'es'
-          ? 'Las contrasenas no coinciden.'
+          ? 'Las contraseñas no coinciden.'
           : 'Passwords do not match.'
       );
       return;
