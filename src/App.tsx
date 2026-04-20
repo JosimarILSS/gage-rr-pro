@@ -22,8 +22,10 @@ export default function App() {
       <LoginPage
         lang={lang}
         authError={authSession.authError}
-        isLoggingIn={authSession.isLoggingIn}
-        onLogin={authSession.handleLogin}
+        isAuthLoading={authSession.isAuthLoading}
+        onGoogleLogin={authSession.handleLoginWithGoogle}
+        onEmailLogin={authSession.handleLoginWithEmail}
+        onEmailRegister={authSession.handleRegisterWithEmail}
         onToggleLang={toggleLang}
       />
     );
@@ -43,4 +45,3 @@ export default function App() {
     />
   );
 }
-

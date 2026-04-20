@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, type User } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  linkWithCredential,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type AuthCredential,
+  type User,
+} from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import { checkPremiumStatus, getAuthErrorMessage } from '../services/auth';
 import {
@@ -15,12 +26,19 @@ type UseAuthSessionResult = {
   loadingAuth: boolean;
   esPremium: boolean;
   authError: string | null;
-  isLoggingIn: boolean;
+  isAuthLoading: boolean;
   isCheckoutLoading: boolean;
   checkoutError: string | null;
-  handleLogin: () => Promise<void>;
+  handleLoginWithGoogle: () => Promise<void>;
+  handleLoginWithEmail: (email: string, password: string) => Promise<void>;
+  handleRegisterWithEmail: (email: string, password: string, confirmPassword: string) => Promise<void>;
   handleLogout: () => Promise<void>;
   handleUnlockPremium: () => Promise<void>;
+};
+
+type PendingGoogleLink = {
+  email: string;
+  credential: AuthCredential;
 };
 
 export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
@@ -28,9 +46,10 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [esPremium, setEsPremium] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [pendingGoogleLink, setPendingGoogleLink] = useState<PendingGoogleLink | null>(null);
 
   const apiBaseUrl = useMemo(
     // Empty string = same origin (Vercel). Fallback to localhost only in local dev.
@@ -99,17 +118,60 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     syncCheckoutReturn();
   }, [apiBaseUrl, user]);
 
-  const handleLogin = async () => {
-    if (isLoggingIn) return;
+  const clearPendingGoogleLinkIfUnmatched = (email: string) => {
+    if (!pendingGoogleLink) return;
+    if (pendingGoogleLink.email.toLowerCase() !== email.toLowerCase()) return;
+    setPendingGoogleLink(null);
+  };
 
-    setIsLoggingIn(true);
+  const tryLinkPendingGoogleCredential = async (signedInUser: User, email: string) => {
+    if (!pendingGoogleLink) return;
+    if (pendingGoogleLink.email.toLowerCase() !== email.toLowerCase()) return;
+
+    const hasGoogleProvider = signedInUser.providerData.some((provider) => provider.providerId === 'google.com');
+    if (hasGoogleProvider) {
+      setPendingGoogleLink(null);
+      return;
+    }
+
+    try {
+      await linkWithCredential(signedInUser, pendingGoogleLink.credential);
+      setPendingGoogleLink(null);
+    } catch (error: any) {
+      const code = error?.code as string | undefined;
+      if (code === 'auth/provider-already-linked' || code === 'auth/credential-already-in-use') {
+        setPendingGoogleLink(null);
+        return;
+      }
+      console.error('Error linking Google provider:', error);
+    }
+  };
+
+  const handleLoginWithGoogle = async () => {
+    if (isAuthLoading) return;
+
+    setIsAuthLoading(true);
     setAuthError(null);
 
     try {
       await signInWithPopup(auth, googleProvider);
+      setPendingGoogleLink(null);
     } catch (error: any) {
       const code = error?.code as string | undefined;
       console.error('Error logging in:', error);
+
+      if (code === 'auth/account-exists-with-different-credential') {
+        const pendingCredential = GoogleAuthProvider.credentialFromError(error);
+        const email = error?.customData?.email as string | undefined;
+        if (pendingCredential && email) {
+          setPendingGoogleLink({
+            email: email.toLowerCase(),
+            credential: pendingCredential,
+          });
+        }
+        setAuthError(getAuthErrorMessage(code, lang, error?.message));
+        return;
+      }
 
       if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         setAuthError(getAuthErrorMessage(code, lang, error?.message));
@@ -130,7 +192,63 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
         setAuthError(getAuthErrorMessage(code, lang, error?.message));
       }
     } finally {
-      setIsLoggingIn(false);
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLoginWithEmail = async (email: string, password: string) => {
+    if (isAuthLoading) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
+    setIsAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      await tryLinkPendingGoogleCredential(credential.user, normalizedEmail);
+      clearPendingGoogleLinkIfUnmatched(normalizedEmail);
+    } catch (error: any) {
+      const code = error?.code as string | undefined;
+      setAuthError(getAuthErrorMessage(code, lang, error?.message));
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleRegisterWithEmail = async (email: string, password: string, confirmPassword: string) => {
+    if (isAuthLoading) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
+    setAuthError(null);
+
+    if (!normalizedEmail || !password || !confirmPassword) {
+      setAuthError(
+        lang === 'es'
+          ? 'Completa correo, contrasena y confirmacion de contrasena.'
+          : 'Please complete email, password, and password confirmation.'
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAuthError(
+        lang === 'es'
+          ? 'Las contrasenas no coinciden.'
+          : 'Passwords do not match.'
+      );
+      return;
+    }
+
+    setIsAuthLoading(true);
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+      await tryLinkPendingGoogleCredential(credential.user, normalizedEmail);
+      clearPendingGoogleLinkIfUnmatched(normalizedEmail);
+    } catch (error: any) {
+      const code = error?.code as string | undefined;
+      setAuthError(getAuthErrorMessage(code, lang, error?.message));
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
@@ -174,10 +292,12 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     loadingAuth,
     esPremium,
     authError,
-    isLoggingIn,
+    isAuthLoading,
     isCheckoutLoading,
     checkoutError,
-    handleLogin,
+    handleLoginWithGoogle,
+    handleLoginWithEmail,
+    handleRegisterWithEmail,
     handleLogout,
     handleUnlockPremium,
   };
