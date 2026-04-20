@@ -247,6 +247,19 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     setAuthError(null);
 
     try {
+      const signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+      const googleEnabled = signInMethods.includes('google.com');
+      const passwordEnabled = signInMethods.includes('password');
+
+      if (googleEnabled && !passwordEnabled) {
+        setAuthError(
+          lang === 'es'
+            ? 'Con este correo se inicio sesion con el metodo de Google. Favor de iniciar sesion dando click a "Iniciar sesion con Google" y elegir el correo ingresado.'
+            : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.'
+        );
+        return;
+      }
+
       const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       await tryLinkPendingGoogleCredential(credential.user, normalizedEmail);
       clearPendingGoogleLinkIfUnmatched(normalizedEmail);
