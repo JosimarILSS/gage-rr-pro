@@ -242,6 +242,10 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
     const normalizedEmail = email.trim().toLowerCase();
     let signInMethods: string[] = [];
+    const genericEmailLoginHint =
+      lang === 'es'
+        ? 'No se pudo ingresar, el correo y la contraseña son incorrectos o anteriormente se ha iniciado sesión con Google con este mismo correo, si es así, favor de dar click en "Iniciar sesión con Google" y el mismo correo con el cual quieres ingresar.'
+        : 'Could not sign in. The email or password is incorrect, or this email has previously used Google sign-in. If so, click "Sign in with Google" and choose the same email.';
     setIsAuthLoading(true);
     setAuthError(null);
 
@@ -251,11 +255,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       const passwordEnabled = signInMethods.includes('password');
 
       if (googleEnabled && !passwordEnabled) {
-        setAuthError(
-          lang === 'es'
-            ? 'Con este correo se inicio sesion con el metodo de Google. Favor de iniciar sesion dando click a "Iniciar sesion con Google" y elegir el correo ingresado.'
-            : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.'
-        );
+        setAuthError(genericEmailLoginHint);
         return;
       }
 
@@ -268,20 +268,19 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         const googleEnabled = signInMethods.includes('google.com');
         const passwordEnabled = signInMethods.includes('password');
-        const googleLoginHint =
-          lang === 'es'
-            ? 'Con este correo se inicio sesión con el método de Google, favor de iniciar sesión dando click a "Iniciar sesión con Google" y elegir el correo ingresado.'
-            : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.';
 
         if (googleEnabled && !passwordEnabled) {
-          setAuthError(googleLoginHint);
+          setAuthError(genericEmailLoginHint);
           return;
         }
 
         if (signInMethods.length === 0) {
-          setAuthError(googleLoginHint);
+          setAuthError(genericEmailLoginHint);
           return;
         }
+
+        setAuthError(genericEmailLoginHint);
+        return;
       }
 
       setAuthError(getAuthErrorMessage(code, lang, error?.message));
