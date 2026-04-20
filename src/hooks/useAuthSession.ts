@@ -72,8 +72,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
           });
-        } catch (err) {
-          console.error('[auth] register failed (non-fatal):', err);
+        } catch {
+          // Silencioso para no exponer detalles internos al cliente.
         }
       }
     });
@@ -107,8 +107,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
         const premium = await checkPremiumStatus(user);
         setEsPremium(premium);
-      } catch (error) {
-        console.error('Error syncing checkout return:', error);
+      } catch {
+        // Silencioso para no exponer detalles internos al cliente.
       } finally {
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('checkout');
@@ -154,7 +154,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
         );
         return;
       }
-      console.error('Error linking Google provider:', error);
+      // Silencioso para no exponer detalles internos al cliente.
     }
   };
 
@@ -201,7 +201,6 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       await validateGoogleSignInResult(result);
     } catch (error: any) {
       const code = error?.code as string | undefined;
-      console.error('Error logging in:', error);
 
       if (code === 'auth/account-exists-with-different-credential') {
         const pendingCredential = GoogleAuthProvider.credentialFromError(error);
@@ -222,7 +221,6 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
           await signInWithRedirect(auth, googleProvider);
           return;
         } catch (redirectError: any) {
-          console.error('Error redirect login:', redirectError);
           setAuthError(
             getAuthErrorMessage(
               redirectError?.code as string | undefined,
@@ -249,10 +247,6 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
     try {
       signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
-      console.log('[auth] fetchSignInMethodsForEmail:', {
-        email: normalizedEmail,
-        methods: signInMethods,
-      });
       const googleEnabled = signInMethods.includes('google.com');
       const passwordEnabled = signInMethods.includes('password');
 
@@ -270,32 +264,22 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       clearPendingGoogleLinkIfUnmatched(normalizedEmail);
     } catch (error: any) {
       const code = error?.code as string | undefined;
-      console.error('[auth] email login failed:', {
-        email: normalizedEmail,
-        code,
-        message: error?.message,
-        methodsDetected: signInMethods,
-      });
 
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         const googleEnabled = signInMethods.includes('google.com');
         const passwordEnabled = signInMethods.includes('password');
+        const googleLoginHint =
+          lang === 'es'
+            ? 'Con este correo se inicio sesión con el método de Google, favor de iniciar sesión dando click a "Iniciar sesión con Google" y elegir el correo ingresado.'
+            : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.';
 
         if (googleEnabled && !passwordEnabled) {
-          setAuthError(
-            lang === 'es'
-              ? 'Con este correo se inicio sesion con el metodo de Google, favor de iniciar sesion dando click a "Iniciar sesion con Google" y elegir el correo ingresado.'
-              : 'This email is configured with Google sign-in. Please click "Sign in with Google" and choose this email.'
-          );
+          setAuthError(googleLoginHint);
           return;
         }
 
         if (signInMethods.length === 0) {
-          setAuthError(
-            lang === 'es'
-              ? 'No se pudo iniciar con correo. Si este correo fue registrado con Google, da click en "Iniciar sesion con Google" y elige el mismo correo.'
-              : 'Email sign-in failed. If this email was registered with Google, click "Sign in with Google" and choose the same email.'
-          );
+          setAuthError(googleLoginHint);
           return;
         }
       }
@@ -346,8 +330,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-    } catch (error) {
-      console.error('Error logging out:', error);
+    } catch {
+      // Silencioso para no exponer detalles internos al cliente.
     }
   };
 
@@ -370,8 +354,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       // Guardar posición de scroll para restaurarla al volver (la app siempre irá a sección 5)
       sessionStorage.setItem('scrollBeforeCheckout', String(window.scrollY));
       window.location.assign(payload.url);
-    } catch (error) {
-      console.error('Error starting Stripe checkout:', error);
+    } catch {
       setCheckoutError(getCheckoutErrorMessage(lang));
     } finally {
       setIsCheckoutLoading(false);

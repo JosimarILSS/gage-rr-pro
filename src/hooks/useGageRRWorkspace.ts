@@ -138,8 +138,8 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
         measCol: newMeasCol,
         showResults: false,
       });
-    } catch (error) {
-      console.error('Error parsing uploaded file:', error);
+    } catch {
+      // Silencioso para no exponer detalles internos al cliente.
     }
   };
 
@@ -258,8 +258,7 @@ export const useGageRRWorkspace = (lang: Lang): UseGageRRWorkspaceResult => {
         sigmaMultiplier,
         includeInteraction
       );
-    } catch (error) {
-      console.error(error);
+    } catch {
       return null;
     }
   }, [data, includeInteraction, lie, lse, measCol, opCol, partCol, showResults, sigmaMultiplier, validation]);

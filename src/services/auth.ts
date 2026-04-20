@@ -36,8 +36,7 @@ export const checkPremiumStatus = async (user: User | null): Promise<boolean> =>
       : Number(data.premiumExpiresAt);
 
     return Date.now() < expiresMs;
-  } catch (err) {
-    console.error('[auth] checkPremiumStatus failed, falling back to claim:', err);
+  } catch {
     // Si Firestore falla, no bloquear al usuario — usar claim como respaldo
     const tokenResult = await user.getIdTokenResult(true);
     return tokenResult.claims?.premium === true;
