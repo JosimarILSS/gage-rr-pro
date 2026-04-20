@@ -206,4 +206,4 @@ const grantPremiumAccessFromSession = async (session, source) => {
   console.log(`[firebase] premium=true set for uid ${firebaseUid}`);
 };
 
-module.exports = { verifyFirebaseToken, grantPremiumAccessFromSession, registerUserIfNew };
+module.exports = { getFirebaseApp, verifyFirebaseToken, grantPremiumAccessFromSession, registerUserIfNew };

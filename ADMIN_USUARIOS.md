@@ -11,6 +11,13 @@ Guía de referencia para gestionar usuarios en Firebase desde la terminal.
 
 ## Comandos
 
+También puedes usar la interfaz web oculta:
+
+- URL: `/admin_user_access`
+- Acceso permitido solo para `j.diaz@ilssg.org`
+- Debe iniciar sesión con Google para ejecutar cambios
+- Si entra otro usuario, la app lo redirige a `/`
+
 ### Registrar usuario nuevo sin premium
 
 Crea el usuario en Firebase Auth y en Firestore con `premium: false`.
