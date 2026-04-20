@@ -26,6 +26,8 @@ export default function LoginPage({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const hasConfirmValue = confirmPassword.length > 0;
+  const passwordsMatch = password.length > 0 && confirmPassword === password;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -141,10 +143,23 @@ export default function LoginPage({
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder={lang === 'es' ? 'Repite tu contraseña' : 'Repeat your password'}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className={`w-full border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 ${
+                  hasConfirmValue
+                    ? passwordsMatch
+                      ? 'border-emerald-500 focus:ring-emerald-300'
+                      : 'border-red-400 focus:ring-red-300'
+                    : 'border-slate-200 focus:ring-indigo-300'
+                }`}
                 minLength={6}
                 required
               />
+              {hasConfirmValue && (
+                <p className={`text-xs ${passwordsMatch ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {passwordsMatch
+                    ? (lang === 'es' ? 'Las contraseñas coinciden.' : 'Passwords match.')
+                    : (lang === 'es' ? 'Las contraseñas no coinciden.' : 'Passwords do not match.')}
+                </p>
+              )}
             </>
           )}
 

@@ -32,6 +32,16 @@ npm run user:manage -- --email correo@ejemplo.com --premium true
 
 ---
 
+### Registrar usuario nuevo y darle premium por N meses (ejemplo: 8)
+
+Crea el usuario y otorga premium con la cantidad de meses indicada.
+
+```bash
+npm run user:manage -- --email correo@ejemplo.com --premium true --months 8
+```
+
+---
+
 ### Registrar usuario nuevo con premium ilimitado (VIP)
 
 Crea el usuario con `premium: true` y `premiumExpiresAt: null` (sin fecha de expiración).
@@ -45,11 +55,22 @@ npm run user:manage -- --email correo@ejemplo.com --premium true --unlimited
 ### Dar premium por 6 meses a usuario existente
 
 Actualiza el documento en Firestore y el Custom Claim.
-Si el usuario aún tiene acceso vigente, los 6 meses se suman desde su fecha de expiración actual (no se penaliza la renovación anticipada).
+Si el usuario aún tiene acceso vigente, los meses se suman desde su fecha de expiración actual (no se penaliza la renovación anticipada).
 Si ya venció, se suman desde hoy.
 
 ```bash
 npm run user:manage -- --email correo@ejemplo.com --premium true
+```
+
+---
+
+### Dar premium por N meses a usuario existente (ejemplo: 8)
+
+Actualiza Firestore + Custom Claims con la cantidad de meses indicada.
+Si el usuario aún tiene premium activo, la extensión parte desde su expiración actual.
+
+```bash
+npm run user:manage -- --email correo@ejemplo.com --premium true --months 8
 ```
 
 ---
@@ -78,6 +99,9 @@ npm run user:manage -- --email correo@ejemplo.com --premium false
 
 - Si el correo **no existe** en Firebase Auth, el script lo crea automáticamente.
 - El usuario creado manualmente deberá iniciar sesión con **Google Sign-In** usando ese mismo correo. Al entrar, Firebase vincula automáticamente su cuenta de Google con el registro existente.
+- `--months` solo aplica con `--premium true`.
+- Si no envías `--months`, el script usa `6` meses por defecto.
+- No se puede combinar `--months` con `--unlimited`.
 - `premiumExpiresAt: null` en Firestore = acceso ilimitado. La app respeta ese valor y no bloquea al usuario aunque no tenga fecha.
 - Si se pone `premium: false` manualmente en Firestore, el usuario pierde acceso inmediatamente sin importar la fecha.
 
