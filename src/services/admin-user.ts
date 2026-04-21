@@ -1,5 +1,6 @@
 type ManageUserAccessPayload = {
   email: string;
+  displayName?: string;
   premium: boolean;
   unlimited: boolean;
   months?: number;
@@ -32,6 +33,7 @@ type ManageUserAccessResult = {
   ok: boolean;
   uid: string;
   email: string;
+  displayName: string | null;
   created: boolean;
   premium: boolean;
   unlimited: boolean;

@@ -21,6 +21,8 @@ También puedes usar la interfaz web oculta:
 - Si entra otro usuario, la app lo redirige a `/`
 - La tabla del panel muestra usuarios registrados con:
   correo, `displayName`, `photoURL`, estado premium, fecha de otorgamiento y fecha de vencimiento
+- Incluye sección para agregar usuario nuevo con:
+  correo, nombre opcional y tipo de acceso (`premium por meses`, `VIP ilimitado`, `sin premium`)
 - En cada fila puedes ejecutar tres acciones:
   dar premium por N meses, dar VIP ilimitado, o quitar premium
 - Incluye filtro rápido por correo o `displayName` (vía API, no solo cliente)

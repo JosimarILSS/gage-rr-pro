@@ -209,17 +209,25 @@ module.exports = async function handler(req, res) {
   }
 
   const emailRaw = req.body?.email;
+  const displayNameRaw = req.body?.displayName;
   const premiumRaw = req.body?.premium;
   const unlimitedRaw = req.body?.unlimited;
   const monthsRaw = req.body?.months;
 
   const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
+  const displayName = typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
+  const hasDisplayName = displayName.length > 0;
   const premium = typeof premiumRaw === 'boolean' ? premiumRaw : null;
   const unlimited = unlimitedRaw === true;
   const months = monthsRaw == null || monthsRaw === '' ? 6 : Number(monthsRaw);
 
   if (!email || !isValidEmail(email)) {
     res.status(400).json({ error: 'Invalid email.' });
+    return;
+  }
+
+  if (displayName.length > 120) {
+    res.status(400).json({ error: 'displayName must be 120 characters or less.' });
     return;
   }
 
@@ -245,7 +253,10 @@ module.exports = async function handler(req, res) {
       userRecord = await auth.getUserByEmail(email);
     } catch (err) {
       if (err?.code === 'auth/user-not-found') {
-        userRecord = await auth.createUser({ email });
+        userRecord = await auth.createUser({
+          email,
+          ...(hasDisplayName ? { displayName } : {}),
+        });
         created = true;
       } else {
         throw err;
@@ -253,6 +264,10 @@ module.exports = async function handler(req, res) {
     }
 
     const uid = userRecord.uid;
+    if (hasDisplayName && userRecord.displayName !== displayName) {
+      userRecord = await auth.updateUser(uid, { displayName });
+    }
+
     const userRef = db.collection('usuarios').doc(uid);
     const snap = await userRef.get();
     const now = new Date();
@@ -289,7 +304,7 @@ module.exports = async function handler(req, res) {
       await userRef.set({
         uid,
         email: userRecord.email || null,
-        displayName: userRecord.displayName || null,
+        displayName: hasDisplayName ? displayName : userRecord.displayName || null,
         photoURL: userRecord.photoURL || null,
         premium,
         premiumExpiresAt: premiumExpiresAtTimestamp,
@@ -307,6 +322,9 @@ module.exports = async function handler(req, res) {
         premiumSource: premium ? (snap.data().premiumSource || 'manual') : null,
         updatedAt: serverNow,
       };
+      if (hasDisplayName) {
+        update.displayName = displayName;
+      }
       if (premium && !snap.data().premiumGrantedAt) {
         update.premiumGrantedAt = serverNow;
       }
@@ -320,6 +338,7 @@ module.exports = async function handler(req, res) {
       ok: true,
       uid,
       email,
+      displayName: hasDisplayName ? displayName : userRecord.displayName || null,
       created,
       premium,
       unlimited: premium ? unlimited : false,

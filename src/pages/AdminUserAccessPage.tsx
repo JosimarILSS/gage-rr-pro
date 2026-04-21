@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Home, LogOut, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { Home, LogOut, RefreshCw, Search, ShieldCheck, UserPlus } from 'lucide-react';
 import {
   listAdminUsers,
   manageUserAccess,
@@ -18,6 +18,12 @@ type AdminUserAccessPageProps = {
 };
 
 export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }: AdminUserAccessPageProps) {
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserDisplayName, setNewUserDisplayName] = useState('');
+  const [newUserAccessMode, setNewUserAccessMode] = useState<'months' | 'vip' | 'none'>('months');
+  const [newUserMonthsInput, setNewUserMonthsInput] = useState('6');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
   const [users, setUsers] = useState<AdminListedUser[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
@@ -93,6 +99,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
         return {
           ...item,
+          displayName: result.displayName || item.displayName,
           premium: result.premium,
           premiumActive,
           premiumUnlimited: result.premium && result.unlimited,
@@ -213,6 +220,76 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
     setMonthsByUser((previous) => ({ ...previous, [uid]: normalized }));
   };
 
+  const handleNewUserMonthsChange = (rawValue: string) => {
+    const onlyDigits = rawValue.replace(/\D/g, '');
+    if (!onlyDigits) {
+      setNewUserMonthsInput('');
+      return;
+    }
+    const normalized = onlyDigits.replace(/^0+(?=\d)/, '');
+    setNewUserMonthsInput(normalized);
+  };
+
+  const handleCreateUser = async () => {
+    const normalizedEmail = newUserEmail.trim().toLowerCase();
+    const normalizedDisplayName = newUserDisplayName.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
+      setError('Ingresa un correo válido para crear el usuario.');
+      return;
+    }
+
+    if (normalizedDisplayName.length > 120) {
+      setError('El nombre opcional no puede exceder 120 caracteres.');
+      return;
+    }
+
+    const months = Number(newUserMonthsInput);
+    if (newUserAccessMode === 'months' && (!Number.isInteger(months) || months <= 0)) {
+      setError('Los meses deben ser un número entero mayor a 0.');
+      return;
+    }
+
+    setIsCreatingUser(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No hay sesión activa.');
+      }
+
+      const token = await currentUser.getIdToken(true);
+      const payload = {
+        email: normalizedEmail,
+        displayName: normalizedDisplayName || undefined,
+        premium: newUserAccessMode !== 'none',
+        unlimited: newUserAccessMode === 'vip',
+        months: newUserAccessMode === 'months' ? months : undefined,
+      };
+
+      const result = await manageUserAccess(apiBaseUrl, token, payload);
+      await loadUsers(false, null, listParams);
+
+      setSuccess(
+        result.created
+          ? `Usuario creado: ${result.email}`
+          : `Usuario actualizado: ${result.email}`
+      );
+
+      setNewUserEmail('');
+      setNewUserDisplayName('');
+      setNewUserAccessMode('months');
+      setNewUserMonthsInput('6');
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo crear/actualizar el usuario.');
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
   const applyActionToUser = async (
     user: AdminListedUser,
     payload: { premium: boolean; unlimited: boolean; months?: number },
@@ -292,6 +369,76 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-base font-semibold text-slate-800">Agregar nuevo usuario</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm text-slate-600">Correo</span>
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(event) => setNewUserEmail(event.target.value)}
+                  placeholder="usuario@dominio.com"
+                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm text-slate-600">Nombre (opcional)</span>
+                <input
+                  type="text"
+                  value={newUserDisplayName}
+                  onChange={(event) => setNewUserDisplayName(event.target.value)}
+                  placeholder="Nombre del usuario"
+                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[220px_200px_auto] gap-3 items-end">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm text-slate-600">Tipo de acceso</span>
+                <select
+                  value={newUserAccessMode}
+                  onChange={(event) =>
+                    setNewUserAccessMode(event.target.value as 'months' | 'vip' | 'none')
+                  }
+                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="months">Premium por meses</option>
+                  <option value="vip">Premium ilimitado (VIP)</option>
+                  <option value="none">Sin premium</option>
+                </select>
+              </label>
+
+              {newUserAccessMode === 'months' && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-slate-600">Meses</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={newUserMonthsInput}
+                    onChange={(event) => handleNewUserMonthsChange(event.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                </label>
+              )}
+
+              <button
+                type="button"
+                onClick={handleCreateUser}
+                disabled={isCreatingUser}
+                className="inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+              >
+                {isCreatingUser ? 'Guardando...' : 'Crear / actualizar usuario'}
+              </button>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-800">Gestión de usuarios y premium</h2>
             <p className="text-sm text-slate-500">{users.length} resultados cargados</p>
