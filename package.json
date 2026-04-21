@@ -14,7 +14,6 @@
     "lint": "npm run lint:no-console && tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.50.1",
     "@stripe/stripe-js": "^9.2.0",
     "dotenv": "^17.4.2",
     "firebase": "^12.12.0",
