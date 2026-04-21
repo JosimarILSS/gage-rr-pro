@@ -307,7 +307,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                   type="text"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Ejemplo: fullstack.dev@ilssg.org o Juan"
+                  placeholder="Ejemplo: correo@dominio.com o nombre de usuario"
                   className="w-full bg-transparent outline-none text-sm"
                 />
               </div>
