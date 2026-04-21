@@ -5,6 +5,9 @@ type ManageUserAccessPayload = {
   months?: number;
 };
 
+type AdminSearchField = 'all' | 'email' | 'displayName';
+type AdminPremiumStatusFilter = 'all' | 'active' | 'expired' | 'vip' | 'noAccess';
+
 type AdminListedUser = {
   uid: string;
   email: string;
@@ -37,15 +40,33 @@ type ManageUserAccessResult = {
   premiumGrantedAt: string | null;
 };
 
+type ListAdminUsersParams = {
+  pageToken?: string | null;
+  pageSize?: number;
+  searchQuery?: string;
+  searchField?: AdminSearchField;
+  premiumStatus?: AdminPremiumStatusFilter;
+};
+
 export const listAdminUsers = async (
   apiBaseUrl: string,
   token: string,
-  pageToken: string | null = null,
-  pageSize = 30
+  paramsInput: ListAdminUsersParams = {}
 ): Promise<ListAdminUsersResult> => {
+  const {
+    pageToken = null,
+    pageSize = 30,
+    searchQuery = '',
+    searchField = 'all',
+    premiumStatus = 'all',
+  } = paramsInput;
+
   const params = new URLSearchParams();
   params.set('pageSize', String(pageSize));
   if (pageToken) params.set('pageToken', pageToken);
+  if (searchQuery.trim()) params.set('q', searchQuery.trim());
+  params.set('searchField', searchField);
+  params.set('premiumStatus', premiumStatus);
 
   const response = await fetch(`${apiBaseUrl}/api/admin/user-access?${params.toString()}`, {
     method: 'GET',
@@ -89,4 +110,7 @@ export type {
   ManageUserAccessResult,
   AdminListedUser,
   ListAdminUsersResult,
+  ListAdminUsersParams,
+  AdminSearchField,
+  AdminPremiumStatusFilter,
 };

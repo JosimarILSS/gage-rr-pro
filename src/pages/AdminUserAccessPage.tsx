@@ -4,6 +4,9 @@ import {
   listAdminUsers,
   manageUserAccess,
   type AdminListedUser,
+  type AdminPremiumStatusFilter,
+  type AdminSearchField,
+  type ListAdminUsersParams,
   type ManageUserAccessResult,
 } from '../services/admin-user';
 import { auth } from '../firebase';
@@ -14,9 +17,6 @@ type AdminUserAccessPageProps = {
   onBackHome: () => void;
 };
 
-type SearchField = 'all' | 'email' | 'displayName';
-type PremiumStatusFilter = 'all' | 'active' | 'expired' | 'vip' | 'noAccess';
-
 export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }: AdminUserAccessPageProps) {
   const [users, setUsers] = useState<AdminListedUser[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
@@ -24,12 +24,17 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeActionKey, setActiveActionKey] = useState<string | null>(null);
   const [monthsByUser, setMonthsByUser] = useState<Record<string, string>>({});
-  const [searchField, setSearchField] = useState<SearchField>('all');
+
+  const [searchField, setSearchField] = useState<AdminSearchField>('all');
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [premiumStatusFilter, setPremiumStatusFilter] = useState<PremiumStatusFilter>('all');
+  const [premiumStatusFilter, setPremiumStatusFilter] = useState<AdminPremiumStatusFilter>('all');
+
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const infiniteLoaderRef = useRef<HTMLDivElement | null>(null);
+  const requestSeqRef = useRef(0);
 
   const apiBaseUrl = useMemo(
     () =>
@@ -38,29 +43,26 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
     []
   );
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 250);
 
-  const matchesPremiumStatusFilter = (user: AdminListedUser): boolean => {
-    if (premiumStatusFilter === 'all') return true;
-    if (premiumStatusFilter === 'vip') return user.premiumActive && user.premiumUnlimited;
-    if (premiumStatusFilter === 'active') return user.premiumActive;
-    if (premiumStatusFilter === 'expired') return user.premium && !user.premiumActive && !!user.premiumExpiresAt;
-    return !user.premiumActive;
-  };
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      if (!matchesPremiumStatusFilter(user)) return false;
-      if (!normalizedSearch) return true;
+  const listParams = useMemo<ListAdminUsersParams>(
+    () => ({
+      pageSize: 30,
+      searchField,
+      searchQuery,
+      premiumStatus: premiumStatusFilter,
+    }),
+    [searchField, searchQuery, premiumStatusFilter]
+  );
 
-      const email = (user.email || '').toLowerCase();
-      const displayName = (user.displayName || '').toLowerCase();
-
-      if (searchField === 'email') return email.includes(normalizedSearch);
-      if (searchField === 'displayName') return displayName.includes(normalizedSearch);
-      return email.includes(normalizedSearch) || displayName.includes(normalizedSearch);
-    });
-  }, [users, normalizedSearch, searchField, premiumStatusFilter]);
+  const hasActiveFilters =
+    Boolean(searchQuery) || searchField !== 'all' || premiumStatusFilter !== 'all';
 
   const formatDate = (value: string | null): string => {
     if (!value) return '—';
@@ -85,10 +87,14 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       previous.map((item) => {
         if (item.email !== targetEmail.toLowerCase()) return item;
 
+        const expirationMs = result.expiresAt ? new Date(result.expiresAt).getTime() : null;
+        const premiumActive =
+          result.premium && (result.unlimited || (expirationMs != null && expirationMs > Date.now()));
+
         return {
           ...item,
           premium: result.premium,
-          premiumActive: result.premium,
+          premiumActive,
           premiumUnlimited: result.premium && result.unlimited,
           premiumExpiresAt: result.premium ? result.expiresAt : null,
           premiumGrantedAt:
@@ -101,15 +107,23 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
   };
 
   const loadUsers = useCallback(
-    async (append: boolean, pageToken: string | null = null) => {
+    async (
+      append: boolean,
+      pageToken: string | null = null,
+      paramsOverride?: ListAdminUsersParams
+    ) => {
       if (append) {
         setIsLoadingMore(true);
       } else {
         setIsLoadingList(true);
+        setUsers([]);
+        setNextPageToken(null);
       }
 
       setError(null);
       setSuccess(null);
+
+      const requestId = ++requestSeqRef.current;
 
       try {
         const currentUser = auth.currentUser;
@@ -118,7 +132,15 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         }
 
         const token = await currentUser.getIdToken(true);
-        const data = await listAdminUsers(apiBaseUrl, token, pageToken, 30);
+        const params: ListAdminUsersParams = {
+          ...(paramsOverride || listParams),
+          pageToken,
+          pageSize: 30,
+        };
+
+        const data = await listAdminUsers(apiBaseUrl, token, params);
+
+        if (requestId !== requestSeqRef.current) return;
 
         setUsers((previous) => {
           if (!append) return data.users;
@@ -139,8 +161,11 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
         setNextPageToken(data.nextPageToken);
       } catch (err: any) {
+        if (requestId !== requestSeqRef.current) return;
         setError(err?.message || 'No se pudo cargar el listado de usuarios.');
       } finally {
+        if (requestId !== requestSeqRef.current) return;
+
         if (append) {
           setIsLoadingMore(false);
         } else {
@@ -148,12 +173,12 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         }
       }
     },
-    [apiBaseUrl]
+    [apiBaseUrl, listParams]
   );
 
   useEffect(() => {
-    loadUsers(false, null);
-  }, [loadUsers]);
+    loadUsers(false, null, listParams);
+  }, [loadUsers, listParams]);
 
   useEffect(() => {
     const target = infiniteLoaderRef.current;
@@ -164,7 +189,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         const entry = entries[0];
         if (!entry?.isIntersecting) return;
         if (!nextPageToken || isLoadingMore || isLoadingList) return;
-        loadUsers(true, nextPageToken);
+        loadUsers(true, nextPageToken, listParams);
       },
       {
         root: null,
@@ -175,7 +200,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [loadUsers, nextPageToken, isLoadingList, isLoadingMore]);
+  }, [loadUsers, listParams, nextPageToken, isLoadingList, isLoadingMore]);
 
   const handleMonthsChange = (uid: string, rawValue: string) => {
     const onlyDigits = rawValue.replace(/\D/g, '');
@@ -231,17 +256,17 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       <div className="max-w-7xl mx-auto space-y-5">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start justify-between gap-3">
           <div>
-            {/* <div className="inline-flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1">
+            <div className="inline-flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1">
               <ShieldCheck className="w-4 h-4" />
               Acceso administrativo restringido
-            </div> */}
+            </div>
             <h1 className="text-2xl font-bold text-slate-800 mt-3">Admin User Access</h1>
             <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
           </div>
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => loadUsers(false, null)}
+              onClick={() => loadUsers(false, null, listParams)}
               disabled={isLoadingList}
               className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -269,7 +294,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-800">Gestión de usuarios y premium</h2>
-            <p className="text-sm text-slate-500">{filteredUsers.length} resultados · {users.length} cargados</p>
+            <p className="text-sm text-slate-500">{users.length} resultados cargados</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)] gap-3">
@@ -277,7 +302,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
               <span className="text-sm text-slate-600">Filtrar por</span>
               <select
                 value={searchField}
-                onChange={(event) => setSearchField(event.target.value as SearchField)}
+                onChange={(event) => setSearchField(event.target.value as AdminSearchField)}
                 className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               >
                 <option value="all">Correo o nombre de usuario</option>
@@ -289,7 +314,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
               <span className="text-sm text-slate-600">Estado premium</span>
               <select
                 value={premiumStatusFilter}
-                onChange={(event) => setPremiumStatusFilter(event.target.value as PremiumStatusFilter)}
+                onChange={(event) => setPremiumStatusFilter(event.target.value as AdminPremiumStatusFilter)}
                 className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               >
                 <option value="all">Todos</option>
@@ -305,8 +330,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                 <Search className="w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="Ejemplo: correo@dominio.com o nombre de usuario"
                   className="w-full bg-transparent outline-none text-sm"
                 />
@@ -339,7 +364,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((user) => {
+                  {users.map((user) => {
                     const monthsInput = monthsByUser[user.uid] ?? '6';
                     const months = Number(monthsInput);
                     const canApplyMonths = Number.isInteger(months) && months > 0;
@@ -454,12 +479,12 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                     );
                   })}
 
-                  {filteredUsers.length === 0 && (
+                  {users.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                        {users.length === 0
-                          ? 'No hay usuarios para mostrar.'
-                          : 'No se encontraron usuarios con ese filtro.'}
+                        {hasActiveFilters
+                          ? 'No se encontraron usuarios con ese filtro.'
+                          : 'No hay usuarios para mostrar.'}
                       </td>
                     </tr>
                   )}
@@ -470,12 +495,12 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              Carga progresiva activa: se cargan 30 usuarios por bloque al hacer scroll sobre la lista en caso de que haya más de 30 usuarios registrados por carga.
+              Carga progresiva activa: 30 usuarios por bloque con scroll automático.
             </p>
             {nextPageToken && (
               <button
                 type="button"
-                onClick={() => loadUsers(true, nextPageToken)}
+                onClick={() => loadUsers(true, nextPageToken, listParams)}
                 disabled={isLoadingMore}
                 className="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg px-3 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
               >

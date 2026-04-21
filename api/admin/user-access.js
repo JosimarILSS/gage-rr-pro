@@ -1,7 +1,7 @@
 'use strict';
 
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { getFirestore, FieldPath, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
 
 const parseAllowedAdminEmails = (rawValue) =>
@@ -53,9 +53,87 @@ const parsePageSize = (rawValue) => {
   return Math.min(parsed, 100);
 };
 
+const parseSearchField = (rawValue) => {
+  const value = typeof rawValue === 'string' ? rawValue : 'all';
+  return ['all', 'email', 'displayName'].includes(value) ? value : 'all';
+};
+
+const parsePremiumStatus = (rawValue) => {
+  const value = typeof rawValue === 'string' ? rawValue : 'all';
+  return ['all', 'active', 'expired', 'vip', 'noAccess'].includes(value) ? value : 'all';
+};
+
+const normalizeSearchQuery = (rawValue) => {
+  if (typeof rawValue !== 'string') return '';
+  return rawValue.trim().toLowerCase();
+};
+
+const encodePageToken = (cursorId) => {
+  if (!cursorId) return null;
+  return Buffer.from(JSON.stringify({ cursorId }), 'utf8').toString('base64url');
+};
+
+const decodePageToken = (rawToken) => {
+  if (!rawToken || typeof rawToken !== 'string') return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(rawToken, 'base64url').toString('utf8'));
+    return typeof parsed?.cursorId === 'string' && parsed.cursorId ? parsed.cursorId : null;
+  } catch {
+    return null;
+  }
+};
+
 const toIsoOrNull = (value) => {
   const parsed = toDateOrNull(value);
   return parsed ? parsed.toISOString() : null;
+};
+
+const mapUserFromProfileDoc = (docSnap, nowMs) => {
+  const profile = docSnap.data() || {};
+  const email = (profile.email || '').toLowerCase();
+  const displayName = profile.displayName || null;
+  const photoURL = profile.photoURL || null;
+
+  const premium = typeof profile.premium === 'boolean' ? profile.premium : false;
+  const premiumExpiresAtDate = toDateOrNull(profile.premiumExpiresAt);
+  const premiumGrantedAtDate = toDateOrNull(profile.premiumGrantedAt);
+  const premiumUnlimited = premium && !premiumExpiresAtDate;
+  const premiumActive = premium && (premiumUnlimited || premiumExpiresAtDate.getTime() > nowMs);
+
+  return {
+    uid: docSnap.id,
+    email,
+    displayName,
+    photoURL,
+    premium,
+    premiumActive,
+    premiumUnlimited,
+    premiumGrantedAt: toIsoOrNull(premiumGrantedAtDate),
+    premiumExpiresAt: toIsoOrNull(premiumExpiresAtDate),
+    createdAt: toIsoOrNull(profile.createdAt),
+    lastSignInAt: toIsoOrNull(profile.lastSignInAt),
+  };
+};
+
+const matchesSearch = (user, searchQuery, searchField) => {
+  if (!searchQuery) return true;
+
+  const email = (user.email || '').toLowerCase();
+  const displayName = (user.displayName || '').toLowerCase();
+
+  if (searchField === 'email') return email.includes(searchQuery);
+  if (searchField === 'displayName') return displayName.includes(searchQuery);
+  return email.includes(searchQuery) || displayName.includes(searchQuery);
+};
+
+const matchesPremiumStatus = (user, premiumStatus) => {
+  if (premiumStatus === 'all') return true;
+  if (premiumStatus === 'vip') return user.premiumActive && user.premiumUnlimited;
+  if (premiumStatus === 'active') return user.premiumActive;
+  if (premiumStatus === 'expired') {
+    return user.premium && !user.premiumActive && !!user.premiumExpiresAt;
+  }
+  return !user.premiumActive;
 };
 
 module.exports = async function handler(req, res) {
@@ -73,54 +151,55 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'GET') {
     const pageSize = parsePageSize(req.query?.pageSize);
-    const pageToken = typeof req.query?.pageToken === 'string' ? req.query.pageToken : undefined;
+    const pageToken = decodePageToken(req.query?.pageToken);
+    const searchField = parseSearchField(req.query?.searchField);
+    const premiumStatus = parsePremiumStatus(req.query?.premiumStatus);
+    const searchQuery = normalizeSearchQuery(req.query?.q);
 
     try {
-      const listedUsers = await auth.listUsers(pageSize, pageToken);
-      const userRecords = listedUsers.users || [];
-
       const usersRef = db.collection('usuarios');
-      const profileRefs = userRecords.map((record) => usersRef.doc(record.uid));
-      const profileDocs = profileRefs.length > 0 ? await db.getAll(...profileRefs) : [];
-
-      const profileByUid = new Map();
-      profileDocs.forEach((docSnap) => {
-        profileByUid.set(docSnap.id, docSnap.exists ? docSnap.data() : null);
-      });
-
+      const batchSize = Math.max(pageSize, 100);
       const nowMs = Date.now();
-      const users = userRecords.map((record) => {
-        const profile = profileByUid.get(record.uid) || {};
-        const email = (record.email || profile.email || '').toLowerCase();
-        const premiumFromFirestore = typeof profile.premium === 'boolean' ? profile.premium : undefined;
-        const premiumFromClaims = typeof record.customClaims?.premium === 'boolean'
-          ? record.customClaims.premium
-          : false;
-        const premium = premiumFromFirestore ?? premiumFromClaims;
+      let cursorId = pageToken;
+      let hasMore = false;
+      const users = [];
 
-        const expiresAtDate = toDateOrNull(profile.premiumExpiresAt) || toDateOrNull(record.customClaims?.premiumExpiresAt);
-        const grantedAtDate = toDateOrNull(profile.premiumGrantedAt);
-        const premiumActive = premium && (!expiresAtDate || expiresAtDate.getTime() > nowMs);
+      while (users.length < pageSize) {
+        let query = usersRef.orderBy(FieldPath.documentId()).limit(batchSize);
+        if (cursorId) {
+          query = query.startAfter(cursorId);
+        }
 
-        return {
-          uid: record.uid,
-          email,
-          displayName: record.displayName || profile.displayName || null,
-          photoURL: record.photoURL || profile.photoURL || null,
-          premium,
-          premiumActive,
-          premiumUnlimited: premium && !expiresAtDate,
-          premiumGrantedAt: grantedAtDate ? grantedAtDate.toISOString() : null,
-          premiumExpiresAt: expiresAtDate ? expiresAtDate.toISOString() : null,
-          createdAt: toIsoOrNull(profile.createdAt || record.metadata?.creationTime),
-          lastSignInAt: toIsoOrNull(record.metadata?.lastSignInTime),
-        };
-      });
+        const snap = await query.get();
+        if (snap.empty) {
+          hasMore = false;
+          break;
+        }
+
+        for (const docSnap of snap.docs) {
+          cursorId = docSnap.id;
+          const user = mapUserFromProfileDoc(docSnap, nowMs);
+          if (!matchesSearch(user, searchQuery, searchField)) continue;
+          if (!matchesPremiumStatus(user, premiumStatus)) continue;
+
+          users.push(user);
+          if (users.length >= pageSize) {
+            hasMore = true;
+            break;
+          }
+        }
+
+        if (users.length >= pageSize) break;
+        if (snap.size < batchSize) {
+          hasMore = false;
+          break;
+        }
+      }
 
       res.status(200).json({
         ok: true,
         users,
-        nextPageToken: listedUsers.pageToken || null,
+        nextPageToken: hasMore ? encodePageToken(cursorId) : null,
       });
     } catch (error) {
       console.error('[admin-user-access:list] Failed:', error.message);
