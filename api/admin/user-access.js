@@ -31,21 +31,101 @@ const toDateOrNull = (value) => {
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const ensureAuthorizedAdmin = async (req, res) => {
+  const decodedToken = await verifyFirebaseToken(req, res);
+  if (!decodedToken) return null;
+
+  const requesterEmail = (decodedToken.email || '').toLowerCase();
+  const provider = decodedToken.firebase?.sign_in_provider || '';
+  const isAllowedAdminEmail = ADMIN_ALLOWED_EMAILS.includes(requesterEmail);
+
+  if (!isAllowedAdminEmail || provider !== 'google.com') {
+    res.status(403).json({ error: 'Forbidden. Admin access requires Google sign-in with authorized email.' });
+    return null;
+  }
+
+  return decodedToken;
+};
+
+const parsePageSize = (rawValue) => {
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed <= 0) return 30;
+  return Math.min(parsed, 100);
+};
+
+const toIsoOrNull = (value) => {
+  const parsed = toDateOrNull(value);
+  return parsed ? parsed.toISOString() : null;
+};
+
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
   }
 
-  const decodedToken = await verifyFirebaseToken(req, res);
+  const decodedToken = await ensureAuthorizedAdmin(req, res);
   if (!decodedToken) return;
 
-  const requesterEmail = (decodedToken.email || '').toLowerCase();
-  const provider = decodedToken.firebase?.sign_in_provider || '';
+  const app = getFirebaseApp();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-  const isAllowedAdminEmail = ADMIN_ALLOWED_EMAILS.includes(requesterEmail);
-  if (!isAllowedAdminEmail || provider !== 'google.com') {
-    res.status(403).json({ error: 'Forbidden. Admin access requires Google sign-in with authorized email.' });
+  if (req.method === 'GET') {
+    const pageSize = parsePageSize(req.query?.pageSize);
+    const pageToken = typeof req.query?.pageToken === 'string' ? req.query.pageToken : undefined;
+
+    try {
+      const listedUsers = await auth.listUsers(pageSize, pageToken);
+      const userRecords = listedUsers.users || [];
+
+      const usersRef = db.collection('usuarios');
+      const profileRefs = userRecords.map((record) => usersRef.doc(record.uid));
+      const profileDocs = profileRefs.length > 0 ? await db.getAll(...profileRefs) : [];
+
+      const profileByUid = new Map();
+      profileDocs.forEach((docSnap) => {
+        profileByUid.set(docSnap.id, docSnap.exists ? docSnap.data() : null);
+      });
+
+      const nowMs = Date.now();
+      const users = userRecords.map((record) => {
+        const profile = profileByUid.get(record.uid) || {};
+        const email = (record.email || profile.email || '').toLowerCase();
+        const premiumFromFirestore = typeof profile.premium === 'boolean' ? profile.premium : undefined;
+        const premiumFromClaims = typeof record.customClaims?.premium === 'boolean'
+          ? record.customClaims.premium
+          : false;
+        const premium = premiumFromFirestore ?? premiumFromClaims;
+
+        const expiresAtDate = toDateOrNull(profile.premiumExpiresAt) || toDateOrNull(record.customClaims?.premiumExpiresAt);
+        const grantedAtDate = toDateOrNull(profile.premiumGrantedAt);
+        const premiumActive = premium && (!expiresAtDate || expiresAtDate.getTime() > nowMs);
+
+        return {
+          uid: record.uid,
+          email,
+          displayName: record.displayName || profile.displayName || null,
+          photoURL: record.photoURL || profile.photoURL || null,
+          premium,
+          premiumActive,
+          premiumUnlimited: premium && !expiresAtDate,
+          premiumGrantedAt: grantedAtDate ? grantedAtDate.toISOString() : null,
+          premiumExpiresAt: expiresAtDate ? expiresAtDate.toISOString() : null,
+          createdAt: toIsoOrNull(profile.createdAt || record.metadata?.creationTime),
+          lastSignInAt: toIsoOrNull(record.metadata?.lastSignInTime),
+        };
+      });
+
+      res.status(200).json({
+        ok: true,
+        users,
+        nextPageToken: listedUsers.pageToken || null,
+      });
+    } catch (error) {
+      console.error('[admin-user-access:list] Failed:', error.message);
+      res.status(500).json({ error: 'Could not list users.' });
+    }
     return;
   }
 
@@ -78,10 +158,6 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ error: 'months must be a positive integer.' });
     return;
   }
-
-  const app = getFirebaseApp();
-  const auth = getAuth(app);
-  const db = getFirestore(app);
 
   try {
     let userRecord;
@@ -170,6 +246,7 @@ module.exports = async function handler(req, res) {
       unlimited: premium ? unlimited : false,
       monthsApplied: premium && !unlimited ? months : null,
       expiresAt: premiumExpiresAt ? premiumExpiresAt.toISOString() : null,
+      premiumGrantedAt: premium ? now.toISOString() : null,
     });
   } catch (error) {
     console.error('[admin-user-access] Failed:', error.message);

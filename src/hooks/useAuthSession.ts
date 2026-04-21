@@ -163,8 +163,8 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
         setPendingGoogleLink(null);
         setAuthError(
           lang === 'es'
-            ? 'Ya existe una cuenta de Google separada para este correo. Activa "One account per email address" en Firebase y elimina duplicados para vincular correctamente.'
-            : 'A separate Google account already exists for this email. Enable "One account per email address" in Firebase and remove duplicates to link correctly.'
+            ? 'Este correo ya tiene otra cuenta asociada. Inicia sesión con el método que usaste originalmente.'
+            : 'This email is already associated with another account. Sign in with the method you originally used.'
         );
         return;
       }

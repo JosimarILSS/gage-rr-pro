@@ -5,6 +5,26 @@ type ManageUserAccessPayload = {
   months?: number;
 };
 
+type AdminListedUser = {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  photoURL: string | null;
+  premium: boolean;
+  premiumActive: boolean;
+  premiumUnlimited: boolean;
+  premiumGrantedAt: string | null;
+  premiumExpiresAt: string | null;
+  createdAt: string | null;
+  lastSignInAt: string | null;
+};
+
+type ListAdminUsersResult = {
+  ok: boolean;
+  users: AdminListedUser[];
+  nextPageToken: string | null;
+};
+
 type ManageUserAccessResult = {
   ok: boolean;
   uid: string;
@@ -14,6 +34,32 @@ type ManageUserAccessResult = {
   unlimited: boolean;
   monthsApplied: number | null;
   expiresAt: string | null;
+  premiumGrantedAt: string | null;
+};
+
+export const listAdminUsers = async (
+  apiBaseUrl: string,
+  token: string,
+  pageToken: string | null = null,
+  pageSize = 30
+): Promise<ListAdminUsersResult> => {
+  const params = new URLSearchParams();
+  params.set('pageSize', String(pageSize));
+  if (pageToken) params.set('pageToken', pageToken);
+
+  const response = await fetch(`${apiBaseUrl}/api/admin/user-access?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Could not list users.');
+  }
+
+  return data as ListAdminUsersResult;
 };
 
 export const manageUserAccess = async (
@@ -38,4 +84,9 @@ export const manageUserAccess = async (
   return data as ManageUserAccessResult;
 };
 
-export type { ManageUserAccessPayload, ManageUserAccessResult };
+export type {
+  ManageUserAccessPayload,
+  ManageUserAccessResult,
+  AdminListedUser,
+  ListAdminUsersResult,
+};

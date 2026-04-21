@@ -51,14 +51,14 @@ export const getAuthErrorMessage = (
   const messages = {
     es: {
       invalidApiKey:
-        'La API key de Firebase Web no es valida. Actualiza `VITE_FIREBASE_API_KEY` en tu .env con la configuracion real del proyecto Firebase.',
+        'No se pudo iniciar sesión en este momento. Inténtalo nuevamente en unos minutos.',
       accountExistsDifferentCredential:
         'Este correo ya existe con otro metodo de acceso. Inicia sesion con correo y contraseña para vincular Google automaticamente.',
       unauthorizedDomain:
-        "Dominio no autorizado en Firebase. Agrega el dominio actual (por ejemplo `localhost` o `0.0.0.0`) en Authentication > Settings > Authorized domains.",
+        'No se pudo completar el inicio de sesión desde este entorno. Inténtalo más tarde.',
       operationNotAllowed:
-        'Google Sign-In no está habilitado en Firebase. Actívalo en Authentication > Sign-in method > Google.',
-      networkFailed: 'No se pudo conectar con Firebase. Revisa tu conexión e inténtalo de nuevo.',
+        'Este método de inicio de sesión no está disponible por el momento.',
+      networkFailed: 'No se pudo conectar al servicio. Revisa tu conexión e inténtalo de nuevo.',
       popupBlocked: 'El navegador bloqueó la ventana emergente. Se intentará iniciar sesión por redirección.',
       emailAlreadyInUse:
         'Ese correo ya esta registrado. Inicia sesion o usa Google con ese mismo correo.',
@@ -67,18 +67,18 @@ export const getAuthErrorMessage = (
       weakPassword: 'La contraseña debe tener al menos 6 caracteres.',
       tooManyRequests:
         'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.',
-      defaultError: 'No se pudo iniciar sesión con Google. Revisa la consola para más detalles.',
+      defaultError: 'No se pudo iniciar sesión con Google. Inténtalo nuevamente.',
     },
     en: {
       invalidApiKey:
-        'The Firebase Web API key is invalid. Update `VITE_FIREBASE_API_KEY` in .env using the real Firebase app config.',
+        'Could not sign in right now. Please try again in a few minutes.',
       accountExistsDifferentCredential:
         'This email already exists with a different sign-in method. Sign in with email and password to link Google automatically.',
       unauthorizedDomain:
-        'Unauthorized Firebase domain. Add the current host (for example `localhost` or `0.0.0.0`) in Authentication > Settings > Authorized domains.',
+        'Sign-in could not be completed from this environment. Please try again later.',
       operationNotAllowed:
-        'Google Sign-In is not enabled in Firebase. Enable it in Authentication > Sign-in method > Google.',
-      networkFailed: 'Could not connect to Firebase. Check your network and try again.',
+        'This sign-in method is currently unavailable.',
+      networkFailed: 'Could not connect to the service. Check your network and try again.',
       popupBlocked: 'The browser blocked the popup window. Redirect sign-in will be attempted.',
       emailAlreadyInUse:
         'That email is already registered. Sign in instead or use Google with the same email.',
@@ -86,7 +86,7 @@ export const getAuthErrorMessage = (
       invalidCredential: 'Invalid credentials. Check email and password.',
       weakPassword: 'Password must be at least 6 characters.',
       tooManyRequests: 'Too many attempts. Please wait a few minutes and try again.',
-      defaultError: 'Google sign-in failed. Check the console for details.',
+      defaultError: 'Google sign-in failed. Please try again.',
     },
   };
 

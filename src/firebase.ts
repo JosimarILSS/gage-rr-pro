@@ -5,9 +5,7 @@ import { getFirestore } from 'firebase/firestore';
 const readFirebaseEnv = (key: keyof ImportMetaEnv): string => {
   const value = import.meta.env[key];
   if (!value || !value.trim()) {
-    throw new Error(
-      `[Firebase config] Missing ${key}. Add it to your .env file (see .env.example).`
-    );
+    throw new Error('La aplicación no pudo inicializarse correctamente.');
   }
   return value.trim();
 };

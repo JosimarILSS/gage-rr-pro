@@ -24,7 +24,7 @@ export default function PremiumUnlockCard({
         'Los cálculos de ANOVA se han completado. Para desbloquear el diagnóstico detallado y las recomendaciones de acción, adquiere tu acceso permanente.',
       button: 'Desbloquear por 150 MXN',
       loading: 'Abriendo checkout...',
-      footer: 'Acceso único de por vida • Pago seguro vía Stripe',
+      footer: 'Pago seguro vía Stripe',
       modalTitle: 'Confirmar Compra',
       modalBody:
         'Vas a abrir Stripe Checkout para pagar 150 MXN. Al confirmar el pago, tu cuenta se marcará como premium automáticamente.',
@@ -37,7 +37,7 @@ export default function PremiumUnlockCard({
         'ANOVA calculations are complete. To unlock detailed diagnostics and action recommendations, purchase your lifetime access.',
       button: 'Unlock for 150 MXN',
       loading: 'Opening checkout...',
-      footer: 'One-time lifetime access • Secure Stripe payment',
+      footer: 'Secure Stripe payment',
       modalTitle: 'Confirm Purchase',
       modalBody:
         'You are about to open Stripe Checkout for 150 MXN. Once paid, your account will be marked as premium automatically.',

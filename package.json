@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint:no-console": "node server/scripts/check-no-console.cjs",
+    "lint": "npm run lint:no-console && tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

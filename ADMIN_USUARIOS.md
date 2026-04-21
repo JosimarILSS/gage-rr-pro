@@ -19,6 +19,13 @@ También puedes usar la interfaz web oculta:
   Ejemplo: `correo1@dominio.com,correo2@dominio.com`
 - Debe iniciar sesión con Google para detectar y permitir acceso admin
 - Si entra otro usuario, la app lo redirige a `/`
+- La tabla del panel muestra usuarios registrados con:
+  correo, `displayName`, `photoURL`, estado premium, fecha de otorgamiento y fecha de vencimiento
+- En cada fila puedes ejecutar tres acciones:
+  dar premium por N meses, dar VIP ilimitado, o quitar premium
+- Incluye filtro rápido por correo o `displayName`
+- Incluye filtro por estado premium: `Activo`, `Expirado`, `VIP ilimitado`, `Sin acceso`
+- El listado carga de forma progresiva en bloques de 30 usuarios (scroll + botón `Cargar más usuarios`)
 
 ### Registrar usuario nuevo sin premium
 
