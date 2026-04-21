@@ -231,10 +231,10 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       <div className="max-w-7xl mx-auto space-y-5">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1">
+            {/* <div className="inline-flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1">
               <ShieldCheck className="w-4 h-4" />
               Acceso administrativo restringido
-            </div>
+            </div> */}
             <h1 className="text-2xl font-bold text-slate-800 mt-3">Admin User Access</h1>
             <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
           </div>
