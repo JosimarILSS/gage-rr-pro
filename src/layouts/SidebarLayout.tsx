@@ -52,9 +52,11 @@ export default function SidebarLayout({
             type="button"
             aria-label="Close sidebar"
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="md:hidden absolute top-4 right-4 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+            className="md:hidden absolute top-3 right-3 w-10 h-10 rounded-full bg-white/95 border border-slate-200 shadow-sm
+              text-slate-500 hover:text-slate-700 transition-colors cursor-pointer
+              flex items-center justify-center"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         )}
         {sidebar}
