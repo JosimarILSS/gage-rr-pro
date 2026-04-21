@@ -280,9 +280,9 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                 onChange={(event) => setSearchField(event.target.value as SearchField)}
                 className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               >
-                <option value="all">Correo o display name</option>
+                <option value="all">Correo o nombre de usuario</option>
                 <option value="email">Solo correo</option>
-                <option value="displayName">Solo display name</option>
+                <option value="displayName">Solo nombre de usuario</option>
               </select>
             </label>
             <label className="flex flex-col gap-1">
@@ -470,7 +470,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              Carga progresiva activa: se cargan 30 usuarios por bloque al hacer scroll.
+              Carga progresiva activa: se cargan 30 usuarios por bloque al hacer scroll sobre la lista en caso de que haya más de 30 usuarios registrados por carga.
             </p>
             {nextPageToken && (
               <button
