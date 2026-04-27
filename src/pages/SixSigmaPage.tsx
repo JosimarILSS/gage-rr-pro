@@ -385,7 +385,9 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
   };
 
   const isCentered = stats ? Math.abs(stats.mean - nominal) < Math.abs(usl - lsl) * 0.1 : false;
-  const distributionReason = getDistributionReason(stats?.bestFitDist, t);
+  const appliedDistribution = stats?.bestFitDist;
+  const showAdjustedCapability = Boolean(appliedDistribution && appliedDistribution !== 'Normal');
+  const distributionReason = getDistributionReason(appliedDistribution, t);
   const chartLabelX =
     stats?.bestFitDist === 'Weibull' || stats?.bestFitDist === 'Lognormal' ? t.logValue : t.observedValue;
   const chartLabelY =
@@ -576,7 +578,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
           <section className="min-h-0 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="app-label flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4 app-text-primary" />
+                <FileSpreadsheet className="h-4 w-4 app-text-primary pb-[15px]" />
                 {t.config}
               </h2>
               <span className="app-badge">{subgroups.length}</span>
@@ -672,7 +674,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
             <section className="app-panel p-6" style={{ background: 'var(--app-primary-soft)', borderColor: 'var(--app-primary-border)' }}>
               <div className="flex items-center gap-2 mb-4" style={{ color: 'var(--app-primary-text)' }}>
                 <TrendingUp size={20} />
-                <h2 className="font-bold text-lg">{stats.isNormal && !selectedDist ? t.detailedStats : t.nonNormalStats}</h2>
+                <h2 className="font-bold text-lg">{showAdjustedCapability ? t.nonNormalStats : t.detailedStats}</h2>
               </div>
 
               {stats.suggestions.length > 0 && (
@@ -717,10 +719,10 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 </div>
               )}
 
-              {(!stats.isNormal || selectedDist) && (
+              {showAdjustedCapability && appliedDistribution && (
                 <>
                   <p className="text-sm mb-4" style={{ color: 'var(--app-primary-text)' }}>
-                    {selectedDist ? `${t.selectedDistribution}: ${selectedDist}` : t.adjustedExplanation}
+                    {`${t.selectedDistribution}: ${appliedDistribution}`}
                   </p>
                   {distributionReason && (
                     <div className="app-callout app-callout-primary flex items-start gap-2 mb-4">
