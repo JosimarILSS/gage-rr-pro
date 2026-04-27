@@ -584,7 +584,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
               <span className="app-badge">{subgroups.length}</span>
             </div>
 
-            <div className="app-table-shell max-h-[44vh] overflow-auto">
+            <div className="app-table-shell max-h-[44vh] overflow-auto pb-4">
               <table className="min-w-[360px] w-full text-left text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="app-table-head">
