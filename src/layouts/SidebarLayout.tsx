@@ -31,7 +31,7 @@ export default function SidebarLayout({
        shadow-xl`;
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
+    <div className="h-screen app-shell flex flex-col md:flex-row overflow-hidden">
       {!showSidebarOnlyOnMobile && isMobileSidebarOpen && (
         <button
           id="print-sidebar-overlay"
@@ -44,7 +44,7 @@ export default function SidebarLayout({
 
       <div
         id="print-sidebar"
-        className={`bg-white border-r border-slate-200 p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:shadow-sm md:relative md:translate-x-0 ${mobileSidebarClass}`}
+        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass}`}
       >
         {!showSidebarOnlyOnMobile && (
           <button
@@ -52,9 +52,7 @@ export default function SidebarLayout({
             type="button"
             aria-label="Close sidebar"
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="md:hidden absolute top-3 right-3 w-10 h-10 rounded-full bg-white/95 border border-slate-200 shadow-sm
-              text-slate-500 hover:text-slate-700 transition-colors cursor-pointer
-              flex items-center justify-center"
+            className="md:hidden absolute top-3 right-3 app-button app-button-secondary app-button-round app-button-icon"
           >
             <X className="w-6 h-6" />
           </button>
@@ -76,7 +74,7 @@ export default function SidebarLayout({
           type="button"
           aria-label="Open sidebar"
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="md:hidden fixed bottom-5 right-5 z-20 inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+          className="md:hidden fixed bottom-5 right-5 z-20 app-button app-button-primary app-button-round w-14 h-14 shadow-lg"
         >
           <PanelLeft className="w-5 h-5" />
         </button>

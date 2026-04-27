@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 /* ── Estilos de impresión para "Generar PDF" ─────────────────────────────── */
 @media print {

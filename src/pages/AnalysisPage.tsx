@@ -27,11 +27,11 @@ const PartTooltip = ({ active, payload, label, measLabel }: any) => {
   const mean = payload.find((p: any) => p.dataKey === 'mean');
   const vals = payload.filter((p: any) => p.dataKey?.startsWith('val_') && p.value != null);
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm min-w-[160px]">
-      <p className="font-semibold text-slate-800 mb-2">{label}</p>
-      {mean && <p className="text-indigo-600 font-medium mb-1">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
+    <div className="app-panel p-3 text-sm min-w-[160px]" style={{ boxShadow: 'var(--app-shadow-raised)' }}>
+      <p className="font-semibold app-title mb-2">{label}</p>
+      {mean && <p className="app-text-primary font-medium mb-1">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
       {vals.map((v: any, i: number) => (
-        <p key={i} className="text-slate-500">{`${measLabel} ${i + 1} : ${Number(v.value).toFixed(2)}`}</p>
+        <p key={i} className="app-muted">{`${measLabel} ${i + 1} : ${Number(v.value).toFixed(2)}`}</p>
       ))}
     </div>
   );
@@ -41,9 +41,9 @@ const OpTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const mean = payload.find((p: any) => p.dataKey === 'mean');
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm min-w-[140px]">
-      <p className="font-semibold text-slate-800 mb-1">{label}</p>
-      {mean && <p className="text-slate-600">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
+    <div className="app-panel p-3 text-sm min-w-[140px]" style={{ boxShadow: 'var(--app-shadow-raised)' }}>
+      <p className="font-semibold app-title mb-1">{label}</p>
+      {mean && <p className="app-muted">{`Media : ${Number(mean.value).toFixed(2)}`}</p>}
     </div>
   );
 };
@@ -148,7 +148,29 @@ export default function AnalysisPage({
     }
   }, [esPremium]);
 
-  const chartColors = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const chartColors = [
+    'var(--app-chart-primary)',
+    'var(--app-chart-tertiary)',
+    'var(--app-chart-secondary)',
+    'var(--app-chart-warning)',
+    'var(--app-chart-danger)',
+    '#8b5cf6',
+    '#ec4899',
+  ];
+  const gageDiagnosticClass =
+    (results?.hasTolerance ? results.pctTolGage : results?.pctStudyGage || 0) < 10
+      ? 'app-callout-success'
+      : (results?.hasTolerance ? results.pctTolGage : results?.pctStudyGage || 0) <= 30
+        ? 'app-callout-warning'
+        : 'app-callout-danger';
+  const gageDiagnosticIconClass =
+    (results?.hasTolerance ? results.pctTolGage : results?.pctStudyGage || 0) < 10
+      ? 'app-text-success'
+      : (results?.hasTolerance ? results.pctTolGage : results?.pctStudyGage || 0) <= 30
+        ? 'app-text-warning'
+        : 'app-text-danger';
+  const resolutionDiagnosticClass = (results?.ndc || 0) >= 5 ? 'app-callout-success' : 'app-callout-danger';
+  const resolutionDiagnosticIconClass = (results?.ndc || 0) >= 5 ? 'app-text-success' : 'app-text-danger';
 
   return (
     <SidebarLayout
@@ -161,32 +183,32 @@ export default function AnalysisPage({
             <button
               type="button"
               onClick={onBackToTools}
-              className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-indigo-700 transition-colors cursor-pointer"
+              className="app-button app-button-secondary mb-4 px-3 py-2 text-sm"
             >
               <ArrowLeft className="w-4 h-4" />
               {lang === 'es' ? 'Volver a herramientas' : 'Back to tools'}
             </button>
           )}
           <div className="flex justify-between items-start mb-4 pr-12 md:pr-0">
-            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <BarChart3 className="text-indigo-600" />
+            <h1 className="text-xl app-title flex items-center gap-2">
+              <BarChart3 style={{ color: 'var(--app-primary)' }} />
               {t[lang].title}
             </h1>
             <button
               onClick={onToggleLang}
-              className="flex items-center gap-1.5 text-sm md:text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors bg-slate-100 px-3 py-2 md:px-2 md:py-1 rounded-lg md:rounded-md cursor-pointer"
+              className="app-button app-button-secondary px-3 py-2 md:px-2 md:py-1 text-sm md:text-xs"
             >
               <Globe className="w-4 h-4 md:w-3 md:h-3" />
               {lang === 'es' ? 'EN' : 'ES'}
             </button>
           </div>
-          <p className="text-sm text-slate-500 mt-1">{t[lang].subtitle}</p>
+          <p className="text-sm app-muted mt-1">{t[lang].subtitle}</p>
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{t[lang].step1}</h2>
+          <h2 className="app-label">{t[lang].step1}</h2>
           <textarea
-            className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none h-32"
+            className="app-input w-full p-3 text-sm resize-none h-32"
             placeholder={t[lang].problemPlaceholder}
             value={problemDesc}
             onChange={(e) => setProblemDesc(e.target.value)}
@@ -194,29 +216,27 @@ export default function AnalysisPage({
         </div>
 
         <div id="print-sidebar-hide" className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{t[lang].loadData}</h2>
-          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+          <h2 className="app-label">{t[lang].loadData}</h2>
+          <label className="app-card app-card-hover flex flex-col items-center justify-center w-full h-28 border-dashed cursor-pointer transition-colors">
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <Upload className="w-7 h-7 text-slate-400 mb-2" />
-              <p className="text-sm text-slate-600"><span className="font-semibold">{t[lang].uploadPrompt}</span></p>
-              <p className="text-xs text-slate-500">{t[lang].dragDrop}</p>
+              <Upload className="w-7 h-7 app-icon-muted mb-2" />
+              <p className="text-sm app-muted"><span className="font-semibold">{t[lang].uploadPrompt}</span></p>
+              <p className="text-xs app-muted">{t[lang].dragDrop}</p>
             </div>
             <input type="file" className="hidden" accept=".csv, .xlsx" onChange={handleFileUpload} />
           </label>
 
           {fileName && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-              <FileSpreadsheet className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span className="text-xs text-indigo-700 font-medium truncate flex-1" title={fileName}>{fileName}</span>
+            <div className="app-badge app-badge-primary flex items-center gap-2 w-full">
+              <FileSpreadsheet className="w-4 h-4 shrink-0" />
+              <span className="text-xs font-medium truncate flex-1" title={fileName}>{fileName}</span>
             </div>
           )}
 
           <button
             onClick={resetWorkspace}
             disabled={!fileName}
-            className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
-              disabled:opacity-40 disabled:cursor-not-allowed
-              enabled:cursor-pointer enabled:bg-red-50 enabled:border enabled:border-red-200 enabled:text-red-600 enabled:hover:bg-red-100"
+            className="app-button app-button-danger w-full py-2 px-3 text-xs"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             {lang === 'es' ? 'Reiniciar datos ingresados y análisis generado' : 'Reset entered data and generated analysis'}
@@ -225,9 +245,7 @@ export default function AnalysisPage({
           <button
             onClick={handleExportPDF}
             disabled={!results || isExportingPDF}
-            className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors
-              disabled:opacity-40 disabled:cursor-not-allowed
-              enabled:cursor-pointer enabled:bg-indigo-50 enabled:border enabled:border-indigo-200 enabled:text-indigo-600 enabled:hover:bg-indigo-100"
+            className="app-button app-button-soft w-full py-2 px-3 text-xs"
           >
             <FileDown className="w-3.5 h-3.5" />
             {isExportingPDF
@@ -236,22 +254,22 @@ export default function AnalysisPage({
           </button>
         </div>
 
-        <div id="print-logout-hide" className="mt-auto pt-6 border-t border-slate-200 space-y-3">
+        <div id="print-logout-hide" className="mt-auto pt-6 border-t app-divider space-y-3">
           {showAdminAccessButton && onGoToAdminAccess && (
             <button
               type="button"
               onClick={onGoToAdminAccess}
-              className="w-full flex items-center justify-center gap-2 text-xs font-medium bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+              className="app-button app-button-soft w-full text-xs px-3 py-2"
             >
               <ShieldCheck className="w-4 h-4" />
               {lang === 'es' ? 'Acceso a administración de usuarios' : 'User Admin Access'}
             </button>
           )}
           <div className="flex items-center justify-between">
-            <div className="text-sm text-slate-600 truncate pr-2" title={userEmail || ''}>
+            <div className="text-sm app-muted truncate pr-2" title={userEmail || ''}>
               {userEmail}
             </div>
-            <button onClick={onLogout} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 shrink-0 transition-colors cursor-pointer">
+            <button onClick={onLogout} className="app-button app-button-danger px-2 py-1 text-xs shrink-0">
               <LogOut className="w-4 h-4" />
               {t[lang].logout}
             </button>
@@ -261,31 +279,31 @@ export default function AnalysisPage({
       }
     >
         {data.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400">
-            <FileSpreadsheet className="w-16 h-16 mb-4 text-slate-300" />
-            <h2 className="text-xl font-medium text-slate-600">{t[lang].waitingData}</h2>
+          <div className="h-full flex flex-col items-center justify-center app-muted">
+            <FileSpreadsheet className="w-16 h-16 mb-4 app-icon-muted" />
+            <h2 className="text-xl font-medium">{t[lang].waitingData}</h2>
             <p className="text-sm mt-2">{t[lang].uploadToStart}</p>
           </div>
         ) : (
           <div className="max-w-5xl mx-auto space-y-8">
             
             {/* 2. Mapeado de Datos */}
-            <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-indigo-500" />
+            <section className="app-panel p-6">
+              <h2 className="text-lg app-title mb-4 flex items-center gap-2">
+                <Settings className="w-5 h-5 app-text-primary" />
                 {t[lang].step2}
               </h2>
               
-              <div className="overflow-x-auto mb-6 border border-slate-200 rounded-lg">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
+              <div className="app-table-shell mb-6">
+                <table className="w-full text-sm text-left app-table-muted">
+                  <thead className="app-table-head text-xs uppercase">
                     <tr>
                       {columns.map(col => <th key={col} className="px-4 py-3">{col}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {data.slice(0, 5).map((row, i) => (
-                      <tr key={i} className="border-b border-slate-100 last:border-0">
+                      <tr key={i} className="border-b app-divider last:border-0">
                         {columns.map(col => <td key={col} className="px-4 py-2">{String(row[col] ?? '')}</td>)}
                       </tr>
                     ))}
@@ -295,44 +313,44 @@ export default function AnalysisPage({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].partCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={partCol} onChange={e => {setPartCol(e.target.value); setShowResults(false);}}>
+                  <label className="app-label">{t[lang].partCol}</label>
+                  <select className="app-input w-full p-2.5 text-sm cursor-pointer" value={partCol} onChange={e => {setPartCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].opCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={opCol} onChange={e => {setOpCol(e.target.value); setShowResults(false);}}>
+                  <label className="app-label">{t[lang].opCol}</label>
+                  <select className="app-input w-full p-2.5 text-sm cursor-pointer" value={opCol} onChange={e => {setOpCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].measCol}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={measCol} onChange={e => {setMeasCol(e.target.value); setShowResults(false);}}>
+                  <label className="app-label">{t[lang].measCol}</label>
+                  <select className="app-input w-full p-2.5 text-sm cursor-pointer" value={measCol} onChange={e => {setMeasCol(e.target.value); setShowResults(false);}}>
                     {columns.map(col => <option key={col} value={col}>{col}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t app-divider">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].lsl}</label>
-                  <input type="number" className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={lie} onChange={e => {setLie(e.target.value); setShowResults(false);}} placeholder="Ej. 10.5" />
+                  <label className="app-label">{t[lang].lsl}</label>
+                  <input type="number" className="app-input w-full p-2.5 text-sm" value={lie} onChange={e => {setLie(e.target.value); setShowResults(false);}} placeholder="Ej. 10.5" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].usl}</label>
-                  <input type="number" className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={lse} onChange={e => {setLse(e.target.value); setShowResults(false);}} placeholder="Ej. 11.5" />
+                  <label className="app-label">{t[lang].usl}</label>
+                  <input type="number" className="app-input w-full p-2.5 text-sm" value={lse} onChange={e => {setLse(e.target.value); setShowResults(false);}} placeholder="Ej. 11.5" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].multiplier}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={sigmaMultiplier} onChange={e => {setSigmaMultiplier(Number(e.target.value)); setShowResults(false);}}>
+                  <label className="app-label">{t[lang].multiplier}</label>
+                  <select className="app-input w-full p-2.5 text-sm cursor-pointer" value={sigmaMultiplier} onChange={e => {setSigmaMultiplier(Number(e.target.value)); setShowResults(false);}}>
                     <option value={6}>{t[lang].mult6}</option>
                     <option value={5.15}>{t[lang].mult515}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t[lang].interaction}</label>
-                  <select className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer" value={includeInteraction ? 'true' : 'false'} onChange={e => {setIncludeInteraction(e.target.value === 'true'); setShowResults(false);}}>
+                  <label className="app-label">{t[lang].interaction}</label>
+                  <select className="app-input w-full p-2.5 text-sm cursor-pointer" value={includeInteraction ? 'true' : 'false'} onChange={e => {setIncludeInteraction(e.target.value === 'true'); setShowResults(false);}}>
                     <option value="true">{t[lang].inclInteraction}</option>
                     <option value="false">{t[lang].omitInteraction}</option>
                   </select>
@@ -342,22 +360,22 @@ export default function AnalysisPage({
 
             {/* 3. Validación de Supuestos */}
             {validation && (
-              <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <section className="app-panel p-6">
+                <h2 className="text-lg app-title mb-4 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 app-text-success" />
                   {t[lang].step3}
                 </h2>
                 
                 {!validation.valid ? (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="app-alert app-alert-danger">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                      <AlertCircle className="w-5 h-5 app-text-danger mt-0.5" />
                       <div>
-                        <h3 className="text-sm font-bold text-red-800 mb-2">{t[lang].invalidData}</h3>
-                        <ul className="list-disc pl-5 text-sm text-red-700 space-y-1 mb-4">
+                        <h3 className="text-sm font-bold mb-2">{t[lang].invalidData}</h3>
+                        <ul className="list-disc pl-5 text-sm space-y-1 mb-4">
                           {validation.errors.map((err, i) => <li key={i}>{err}</li>)}
                         </ul>
-                        <div className="bg-red-100 p-3 rounded-lg text-sm text-red-800 flex gap-2 items-start">
+                        <div className="app-callout app-callout-danger text-sm flex gap-2 items-start">
                           <Info className="w-4 h-4 mt-0.5 shrink-0" />
                           <p><strong>{t[lang].alternatives}</strong> {t[lang].alternativesText}</p>
                         </div>
@@ -366,14 +384,14 @@ export default function AnalysisPage({
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <div className="app-alert app-alert-success flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 app-text-success" />
                       <p className="text-sm font-medium">{t[lang].validData}</p>
                     </div>
                     
                     <button
                       onClick={() => { setShowResults(true); setTimeout(() => scrollTo(section4Ref), 100); }}
-                      className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      className="app-button app-button-primary w-full md:w-auto px-6 py-3 text-sm"
                     >
                       <BarChart3 className="w-4 h-4" />
                       {t[lang].calcBtn}
@@ -386,12 +404,12 @@ export default function AnalysisPage({
             {/* 4 & 5. Resultados e Interpretación */}
             {showResults && results && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <section ref={section4Ref} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">{t[lang].step4}</h2>
+                <section ref={section4Ref} className="app-panel p-6">
+                  <h2 className="text-lg app-title mb-6">{t[lang].step4}</h2>
                   
-                  <div className="overflow-x-auto border border-slate-200 rounded-xl mb-6">
+                  <div className="app-table-shell mb-6">
                     <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                      <thead className="app-table-head font-semibold">
                         <tr>
                           <th className="px-4 py-3">{t[lang].source}</th>
                           <th className="px-4 py-3 text-right">{t[lang].varComp}</th>
@@ -401,8 +419,8 @@ export default function AnalysisPage({
                           {results.hasTolerance && <th className="px-4 py-3 text-right">{t[lang].pctTol}</th>}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-600">
-                        <tr className="font-medium text-slate-800 bg-slate-50/50">
+                      <tbody className="divide-y divide-slate-100 app-table-muted">
+                        <tr className="font-medium app-title" style={{ background: 'var(--app-bg)' }}>
                           <td className="px-4 py-3">{t[lang].totalGage}</td>
                           <td className="px-4 py-3 text-right">{results.varGage.toFixed(5)}</td>
                           <td className="px-4 py-3 text-right">{results.pctContribGage.toFixed(2)}%</td>
@@ -411,7 +429,7 @@ export default function AnalysisPage({
                           {results.hasTolerance && <td className="px-4 py-3 text-right">{results.pctTolGage.toFixed(2)}%</td>}
                         </tr>
                         <tr>
-                          <td className="px-4 py-3 pl-8 text-slate-500">{t[lang].repeatability}</td>
+                          <td className="px-4 py-3 pl-8 app-muted">{t[lang].repeatability}</td>
                           <td className="px-4 py-3 text-right">{results.varRepeatability.toFixed(5)}</td>
                           <td className="px-4 py-3 text-right">{results.pctContribRepeat.toFixed(2)}%</td>
                           <td className="px-4 py-3 text-right">{results.sdRepeat.toFixed(5)}</td>
@@ -419,7 +437,7 @@ export default function AnalysisPage({
                           {results.hasTolerance && <td className="px-4 py-3 text-right">{results.pctTolRepeat.toFixed(2)}%</td>}
                         </tr>
                         <tr>
-                          <td className="px-4 py-3 pl-8 text-slate-500">{t[lang].reproducibility}</td>
+                          <td className="px-4 py-3 pl-8 app-muted">{t[lang].reproducibility}</td>
                           <td className="px-4 py-3 text-right">{results.varReproducibility.toFixed(5)}</td>
                           <td className="px-4 py-3 text-right">{results.pctContribReprod.toFixed(2)}%</td>
                           <td className="px-4 py-3 text-right">{results.sdReprod.toFixed(5)}</td>
@@ -427,24 +445,24 @@ export default function AnalysisPage({
                           {results.hasTolerance && <td className="px-4 py-3 text-right">{results.pctTolReprod.toFixed(2)}%</td>}
                         </tr>
                         <tr>
-                          <td className="px-4 py-3 pl-12 text-slate-400 text-sm">{t[lang].operator}</td>
-                          <td className="px-4 py-3 text-right text-sm text-slate-500">{results.varOp.toFixed(5)}</td>
-                          <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctContribOp.toFixed(2)}%</td>
-                          <td className="px-4 py-3 text-right text-sm text-slate-500">{results.sdOp.toFixed(5)}</td>
-                          <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctStudyOp.toFixed(2)}%</td>
-                          {results.hasTolerance && <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctTolOp.toFixed(2)}%</td>}
+                          <td className="px-4 py-3 pl-12 app-muted text-sm">{t[lang].operator}</td>
+                          <td className="px-4 py-3 text-right text-sm app-muted">{results.varOp.toFixed(5)}</td>
+                          <td className="px-4 py-3 text-right text-sm app-muted">{results.pctContribOp.toFixed(2)}%</td>
+                          <td className="px-4 py-3 text-right text-sm app-muted">{results.sdOp.toFixed(5)}</td>
+                          <td className="px-4 py-3 text-right text-sm app-muted">{results.pctStudyOp.toFixed(2)}%</td>
+                          {results.hasTolerance && <td className="px-4 py-3 text-right text-sm app-muted">{results.pctTolOp.toFixed(2)}%</td>}
                         </tr>
                         {results.includeInteraction && (
                           <tr>
-                            <td className="px-4 py-3 pl-12 text-slate-400 text-sm">{t[lang].opPart}</td>
-                            <td className="px-4 py-3 text-right text-sm text-slate-500">{results.varInteraction.toFixed(5)}</td>
-                            <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctContribInteraction.toFixed(2)}%</td>
-                            <td className="px-4 py-3 text-right text-sm text-slate-500">{results.sdInteraction.toFixed(5)}</td>
-                            <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctStudyInteraction.toFixed(2)}%</td>
-                            {results.hasTolerance && <td className="px-4 py-3 text-right text-sm text-slate-500">{results.pctTolInteraction.toFixed(2)}%</td>}
+                            <td className="px-4 py-3 pl-12 app-muted text-sm">{t[lang].opPart}</td>
+                            <td className="px-4 py-3 text-right text-sm app-muted">{results.varInteraction.toFixed(5)}</td>
+                            <td className="px-4 py-3 text-right text-sm app-muted">{results.pctContribInteraction.toFixed(2)}%</td>
+                            <td className="px-4 py-3 text-right text-sm app-muted">{results.sdInteraction.toFixed(5)}</td>
+                            <td className="px-4 py-3 text-right text-sm app-muted">{results.pctStudyInteraction.toFixed(2)}%</td>
+                            {results.hasTolerance && <td className="px-4 py-3 text-right text-sm app-muted">{results.pctTolInteraction.toFixed(2)}%</td>}
                           </tr>
                         )}
-                        <tr className="font-medium text-slate-800 bg-slate-50/50">
+                        <tr className="font-medium app-title" style={{ background: 'var(--app-bg)' }}>
                           <td className="px-4 py-3">{t[lang].partToPart}</td>
                           <td className="px-4 py-3 text-right">{results.varPart.toFixed(5)}</td>
                           <td className="px-4 py-3 text-right">{results.pctContribPart.toFixed(2)}%</td>
@@ -452,7 +470,7 @@ export default function AnalysisPage({
                           <td className="px-4 py-3 text-right">{results.pctStudyPart.toFixed(2)}%</td>
                           {results.hasTolerance && <td className="px-4 py-3 text-right">{results.pctTolPart.toFixed(2)}%</td>}
                         </tr>
-                        <tr className="font-bold text-slate-900 bg-slate-100">
+                        <tr className="font-bold app-title" style={{ background: 'var(--app-surface-muted)' }}>
                           <td className="px-4 py-3">{t[lang].totalVar}</td>
                           <td className="px-4 py-3 text-right">{results.varTotal.toFixed(5)}</td>
                           <td className="px-4 py-3 text-right">100.00%</td>
@@ -464,14 +482,14 @@ export default function AnalysisPage({
                     </table>
                   </div>
                   
-                  <div className="bg-indigo-50 text-indigo-900 p-4 rounded-xl inline-flex items-center gap-2 font-medium">
-                    <span className="text-indigo-600">{t[lang].ndc}</span> 
+                  <div className="app-callout app-callout-primary inline-flex items-center gap-2 font-medium">
+                    <span className="app-text-primary">{t[lang].ndc}</span> 
                     <span className="text-xl">{results.ndc}</span>
                   </div>
 
                   <div className="mt-10 h-80 w-full">
-                    <h3 className="text-md font-bold text-slate-700 mb-6 text-center">{t[lang].compVarChart}</h3>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <h3 className="text-md app-chart-title mb-6 text-center">{t[lang].compVarChart}</h3>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                       <BarChart
                         data={[
                           {
@@ -515,8 +533,8 @@ export default function AnalysisPage({
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
                     <div className="h-80 w-full">
-                      <h3 className="text-md font-bold text-slate-700 mb-4 text-center">{t[lang].xBarChart}</h3>
-                      <ResponsiveContainer width="100%" height="100%">
+                      <h3 className="text-md app-chart-title mb-4 text-center">{t[lang].xBarChart}</h3>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                         <LineChart data={results.xBarData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="part" tick={{ fill: '#475569', fontSize: 12 }} />
@@ -534,8 +552,8 @@ export default function AnalysisPage({
                     </div>
 
                     <div className="h-80 w-full">
-                      <h3 className="text-md font-bold text-slate-700 mb-4 text-center">{t[lang].rChart}</h3>
-                      <ResponsiveContainer width="100%" height="100%">
+                      <h3 className="text-md app-chart-title mb-4 text-center">{t[lang].rChart}</h3>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                         <LineChart data={results.rData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="part" tick={{ fill: '#475569', fontSize: 12 }} />
@@ -554,14 +572,14 @@ export default function AnalysisPage({
                   </div>
 
                   {/* Nuevas gráficas estilo Minitab */}
-                  <div className="mt-16 border-t border-slate-200 pt-10">
-                    <h2 className="text-lg font-bold text-slate-800 mb-8 text-center">{t[lang].additionalCharts}</h2>
+                  <div className="mt-16 border-t app-divider pt-10">
+                    <h2 className="text-lg app-title mb-8 text-center">{t[lang].additionalCharts}</h2>
                     
                     <div className="grid grid-cols-1 gap-12">
                       {/* Medición por Parte */}
                       <div className="h-80 w-full">
-                        <h3 className="text-md font-bold text-slate-700 mb-4 text-center">{measCol || t[lang].measurement} {t[lang].measByPartChart}</h3>
-                        <ResponsiveContainer width="100%" height="100%">
+                        <h3 className="text-md app-chart-title mb-4 text-center">{measCol || t[lang].measurement} {t[lang].measByPartChart}</h3>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                           <ComposedChart data={results.partChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="part" tick={{ fill: '#475569', fontSize: 12 }} />
@@ -577,8 +595,8 @@ export default function AnalysisPage({
 
                       {/* Medición por Analista */}
                       <div className="h-80 w-full">
-                        <h3 className="text-md font-bold text-slate-700 mb-4 text-center">{measCol || t[lang].measurement} {t[lang].measByOpChart}</h3>
-                        <ResponsiveContainer width="100%" height="100%">
+                        <h3 className="text-md app-chart-title mb-4 text-center">{measCol || t[lang].measurement} {t[lang].measByOpChart}</h3>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                           <ComposedChart data={results.opChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="op" tick={{ fill: '#475569', fontSize: 12 }} />
@@ -595,8 +613,8 @@ export default function AnalysisPage({
 
                       {/* Interacción Parte * Analista */}
                       <div className="h-80 w-full">
-                        <h3 className="text-md font-bold text-slate-700 mb-4 text-center">{t[lang].interactionChart}</h3>
-                        <ResponsiveContainer width="100%" height="100%">
+                        <h3 className="text-md app-chart-title mb-4 text-center">{t[lang].interactionChart}</h3>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                           <LineChart data={results.xBarData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="part" tick={{ fill: '#475569', fontSize: 12 }} />
@@ -621,33 +639,25 @@ export default function AnalysisPage({
                   </div>
                 </section>
 
-                <section ref={section5Ref} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">{t[lang].step5}</h2>
+                <section ref={section5Ref} className="app-panel p-6">
+                  <h2 className="text-lg app-title mb-6">{t[lang].step5}</h2>
                   {esPremium ? (
                     <>
                       {problemDesc && (
-                        <div className="mb-6 p-4 bg-slate-50 border-l-4 border-indigo-500 rounded-r-xl text-slate-700 italic">
+                        <div className="app-callout app-callout-primary mb-6 italic" style={{ borderLeftWidth: 4 }}>
                           "{t[lang].problemContext} {problemDesc}"
                         </div>
                       )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div
-                          className={`p-5 rounded-xl border ${
-                            (results.hasTolerance ? results.pctTolGage : results.pctStudyGage) < 10
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                              : (results.hasTolerance ? results.pctTolGage : results.pctStudyGage) <= 30
-                                ? 'bg-amber-50 border-amber-200 text-amber-900'
-                                : 'bg-red-50 border-red-200 text-red-900'
-                          }`}
-                        >
+                        <div className={`app-callout ${gageDiagnosticClass}`}>
                           <h3 className="font-bold mb-2 flex items-center gap-2">
                             {(results.hasTolerance ? results.pctTolGage : results.pctStudyGage) < 10 ? (
-                              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                              <CheckCircle2 className={`w-5 h-5 ${gageDiagnosticIconClass}`} />
                             ) : (results.hasTolerance ? results.pctTolGage : results.pctStudyGage) <= 30 ? (
-                              <AlertCircle className="w-5 h-5 text-amber-600" />
+                              <AlertCircle className={`w-5 h-5 ${gageDiagnosticIconClass}`} />
                             ) : (
-                              <AlertCircle className="w-5 h-5 text-red-600" />
+                              <AlertCircle className={`w-5 h-5 ${gageDiagnosticIconClass}`} />
                             )}
                             {t[lang].sysDiag}
                           </h3>
@@ -666,18 +676,12 @@ export default function AnalysisPage({
                           </p>
                         </div>
 
-                        <div
-                          className={`p-5 rounded-xl border ${
-                            results.ndc >= 5
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                              : 'bg-red-50 border-red-200 text-red-900'
-                          }`}
-                        >
+                        <div className={`app-callout ${resolutionDiagnosticClass}`}>
                           <h3 className="font-bold mb-2 flex items-center gap-2">
                             {results.ndc >= 5 ? (
-                              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                              <CheckCircle2 className={`w-5 h-5 ${resolutionDiagnosticIconClass}`} />
                             ) : (
-                              <AlertCircle className="w-5 h-5 text-red-600" />
+                              <AlertCircle className={`w-5 h-5 ${resolutionDiagnosticIconClass}`} />
                             )}
                             {t[lang].resDiag}
                           </h3>
@@ -689,36 +693,36 @@ export default function AnalysisPage({
                         </div>
                       </div>
 
-                      <div className="border-t border-slate-200 pt-6">
-                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                          <Users className="w-5 h-5 text-indigo-500" />
+                      <div className="border-t app-divider pt-6">
+                        <h3 className="font-bold app-title mb-4 flex items-center gap-2">
+                          <Users className="w-5 h-5 app-text-primary" />
                           {t[lang].mainErrorSource}
                         </h3>
 
                         {results.pctStudyRepeat > results.pctStudyReprod ? (
                           <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                              <strong className="text-slate-800">{t[lang].repeatBad}</strong> {t[lang].repeatBadDesc}
+                            <p className="text-sm app-muted">
+                              <strong className="app-title">{t[lang].repeatBad}</strong> {t[lang].repeatBadDesc}
                             </p>
-                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-sm text-indigo-900">
+                            <div className="app-callout app-callout-primary text-sm">
                               <strong>{t[lang].repeatNext}</strong>
                             </div>
                           </div>
                         ) : results.pctStudyReprod > results.pctStudyRepeat ? (
                           <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                              <strong className="text-slate-800">{t[lang].reprodBad}</strong> {t[lang].reprodBadDesc}
+                            <p className="text-sm app-muted">
+                              <strong className="app-title">{t[lang].reprodBad}</strong> {t[lang].reprodBadDesc}
                             </p>
-                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-sm text-indigo-900">
+                            <div className="app-callout app-callout-primary text-sm">
                               <strong>{t[lang].reprodNext}</strong>
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                              <strong className="text-slate-800">{t[lang].similarBad}</strong>
+                            <p className="text-sm app-muted">
+                              <strong className="app-title">{t[lang].similarBad}</strong>
                             </p>
-                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-sm text-indigo-900">
+                            <div className="app-callout app-callout-primary text-sm">
                               <strong>{t[lang].similarNext}</strong>
                             </div>
                           </div>

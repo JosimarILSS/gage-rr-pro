@@ -180,22 +180,22 @@ export default function ToolsPage({
       ? copy.premiumExpired
       : copy.premiumInactive;
   const premiumStatusClass = isPremiumActive
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    ? 'app-badge-success'
     : hadPremium
-      ? 'bg-amber-50 text-amber-800 border-amber-200'
-      : 'bg-slate-100 text-slate-700 border-slate-200';
+      ? 'app-badge-warning'
+      : '';
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      <header className="bg-white border-b border-slate-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-              <BarChart3 className="w-5 h-5 text-indigo-600" />
+            <div className="app-icon-tile shrink-0">
+              <BarChart3 className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-slate-500">{copy.appName}</p>
-              <h1 className="text-2xl font-bold text-slate-900">{copy.toolsTitle}</h1>
+              <p className="text-sm app-muted">{copy.appName}</p>
+              <h1 className="text-2xl app-title">{copy.toolsTitle}</h1>
             </div>
           </div>
 
@@ -204,7 +204,7 @@ export default function ToolsPage({
               <button
                 type="button"
                 onClick={onGoToAdminAccess}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                className="app-button app-button-soft px-3 py-2 text-sm"
               >
                 <ShieldCheck className="w-4 h-4" />
                 {copy.admin}
@@ -213,7 +213,7 @@ export default function ToolsPage({
             <button
               type="button"
               onClick={onToggleLang}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="app-button app-button-secondary px-3 py-2 text-sm"
             >
               <Globe className="w-4 h-4" />
               {copy.language}
@@ -225,31 +225,31 @@ export default function ToolsPage({
       <main className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-6 lg:py-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-8">
         <section className="space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">{copy.toolsTitle}</h2>
-            <p className="text-sm text-slate-500 mt-1">{copy.toolsSubtitle}</p>
+            <h2 className="text-lg app-title">{copy.toolsTitle}</h2>
+            <p className="text-sm app-muted mt-1">{copy.toolsSubtitle}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <button
               type="button"
               onClick={onOpenGageRR}
-              className="group min-h-[220px] text-left bg-white border border-slate-200 rounded-lg p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="w-12 h-12 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-indigo-600" />
+                <div className="app-icon-tile app-icon-tile-lg">
+                  <BarChart3 className="w-6 h-6" />
                 </div>
-                <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <span className="app-badge app-badge-success">
                   {copy.toolStatus}
                 </span>
               </div>
 
               <div className="mt-5 flex-1">
-                <h3 className="text-lg font-bold text-slate-900">{copy.toolTitle}</h3>
-                <p className="text-sm text-slate-600 mt-2 leading-6">{copy.toolDescription}</p>
+                <h3 className="text-lg app-title">{copy.toolTitle}</h3>
+                <p className="text-sm app-muted mt-2 leading-6">{copy.toolDescription}</p>
               </div>
 
-              <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
+              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
                 {copy.openTool}
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </div>
@@ -258,23 +258,23 @@ export default function ToolsPage({
             <button
               type="button"
               onClick={onOpenSixSigma}
-              className="group min-h-[220px] text-left bg-white border border-slate-200 rounded-lg p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-emerald-600" />
+                <div className="app-icon-tile app-icon-tile-lg app-icon-tile-success">
+                  <TrendingUp className="w-6 h-6" />
                 </div>
-                <span className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <span className="app-badge app-badge-success">
                   {copy.toolStatus}
                 </span>
               </div>
 
               <div className="mt-5 flex-1">
-                <h3 className="text-lg font-bold text-slate-900">{copy.sixSigmaTitle}</h3>
-                <p className="text-sm text-slate-600 mt-2 leading-6">{copy.sixSigmaDescription}</p>
+                <h3 className="text-lg app-title">{copy.sixSigmaTitle}</h3>
+                <p className="text-sm app-muted mt-2 leading-6">{copy.sixSigmaDescription}</p>
               </div>
 
-              <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
+              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
                 {copy.openTool}
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </div>
@@ -282,14 +282,14 @@ export default function ToolsPage({
           </div>
         </section>
 
-        <aside className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-200">
+        <aside className="app-panel overflow-hidden">
+          <div className="p-5 border-b app-divider">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-900">{copy.profileTitle}</h2>
+              <h2 className="text-lg app-title">{copy.profileTitle}</h2>
               <button
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                className="app-button app-button-danger px-3 py-2 text-sm"
               >
                 <LogOut className="w-4 h-4" />
                 {copy.logout}
@@ -301,65 +301,66 @@ export default function ToolsPage({
                 <img
                   src={photoURL}
                   alt={displayName}
-                  className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                  className="w-12 h-12 rounded-lg object-cover shrink-0"
+                  style={{ border: '1px solid var(--app-border)' }}
                 />
               ) : (
-                <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 shrink-0">
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold shrink-0" style={{ background: 'var(--app-surface-muted)', border: '1px solid var(--app-border)', color: 'var(--app-text-muted)' }}>
                   {getInitials(displayName || email)}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-sm text-slate-500">{copy.account}</p>
-                <p className="font-semibold text-slate-900 truncate" title={email}>
+                <p className="text-sm app-muted">{copy.account}</p>
+                <p className="font-semibold truncate" title={email}>
                   {email}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-5 border-b border-slate-200 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900">{copy.accountData}</h3>
+          <div className="p-5 border-b app-divider space-y-4">
+            <h3 className="text-sm app-title">{copy.accountData}</h3>
             <dl className="space-y-3 text-sm">
               <div className="flex items-start gap-3">
-                <UserCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <UserCircle className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <dt className="text-slate-500">{copy.name}</dt>
-                  <dd className="font-medium text-slate-800 truncate" title={displayName}>
+                  <dt className="app-muted">{copy.name}</dt>
+                  <dd className="font-medium truncate" title={displayName}>
                     {displayName}
                   </dd>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <Mail className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <Mail className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <dt className="text-slate-500">{copy.email}</dt>
-                  <dd className="font-medium text-slate-800 truncate" title={email}>
+                  <dt className="app-muted">{copy.email}</dt>
+                  <dd className="font-medium truncate" title={email}>
                     {email}
                   </dd>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <KeyRound className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <KeyRound className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                 <div>
-                  <dt className="text-slate-500">{copy.provider}</dt>
-                  <dd className="font-medium text-slate-800">{getProviderLabel(signInProvider, lang)}</dd>
+                  <dt className="app-muted">{copy.provider}</dt>
+                  <dd className="font-medium">{getProviderLabel(signInProvider, lang)}</dd>
                 </div>
               </div>
               {createdAt && (
                 <div className="flex items-start gap-3">
-                  <CalendarDays className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <CalendarDays className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                   <div>
-                    <dt className="text-slate-500">{copy.createdAt}</dt>
-                    <dd className="font-medium text-slate-800">{createdAt}</dd>
+                    <dt className="app-muted">{copy.createdAt}</dt>
+                    <dd className="font-medium">{createdAt}</dd>
                   </div>
                 </div>
               )}
               {accountProfile?.uid && (
                 <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <ShieldCheck className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                   <div className="min-w-0">
-                    <dt className="text-slate-500">{copy.userId}</dt>
-                    <dd className="font-medium text-slate-800 truncate" title={accountProfile.uid}>
+                    <dt className="app-muted">{copy.userId}</dt>
+                    <dd className="font-medium truncate" title={accountProfile.uid}>
                       {accountProfile.uid}
                     </dd>
                   </div>
@@ -370,38 +371,38 @@ export default function ToolsPage({
 
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Crown className="w-4 h-4 text-amber-500" />
+              <h3 className="text-sm app-title flex items-center gap-2">
+                <Crown className="w-4 h-4 app-text-warning" />
                 {copy.premium}
               </h3>
-              <span className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${premiumStatusClass}`}>
+              <span className={`app-badge ${premiumStatusClass}`}>
                 {premiumStatusLabel}
               </span>
             </div>
 
-            <dl className="space-y-2 text-sm text-slate-600">
+            <dl className="space-y-2 text-sm app-muted">
               {isPremiumActive && premiumGrantedAt && (
                 <div className="flex items-center justify-between gap-3">
                   <dt>{copy.premiumSince}</dt>
-                  <dd className="font-semibold text-slate-900">{premiumGrantedAt}</dd>
+                  <dd className="font-semibold app-title">{premiumGrantedAt}</dd>
                 </div>
               )}
               {(isPremiumActive || hadPremium) && (
                 <div className="flex items-center justify-between gap-3">
                   <dt>{isPremiumActive ? copy.expires : copy.expired}</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold app-title">
                     {accountProfile?.premiumUnlimited ? copy.noExpiration : premiumExpiresAt || copy.noExpiration}
                   </dd>
                 </div>
               )}
             </dl>
 
-            <div className="border-t border-slate-200 pt-4">
-              <h4 className="text-sm font-semibold text-slate-900">{copy.offerTitle}</h4>
+            <div className="border-t app-divider pt-4">
+              <h4 className="text-sm app-title">{copy.offerTitle}</h4>
               <ul className="mt-3 space-y-2">
                 {copy.benefits.map((benefit) => (
-                  <li key={benefit} className="flex gap-2 text-sm text-slate-600">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <li key={benefit} className="flex gap-2 text-sm app-muted">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--app-success)' }} />
                     <span>{benefit}</span>
                   </li>
                 ))}
@@ -414,13 +415,13 @@ export default function ToolsPage({
                   type="button"
                   onClick={onUnlockPremium}
                   disabled={isCheckoutLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                  className="app-button app-button-primary w-full px-4 py-3 text-sm"
                 >
                   <CreditCard className="w-4 h-4" />
                   {isCheckoutLoading ? copy.loading : copy.unlock}
                 </button>
-                {checkoutError && <p className="mt-3 text-sm text-red-700">{checkoutError}</p>}
-                <p className="mt-2 text-xs text-slate-500">{copy.secure}</p>
+                {checkoutError && <p className="mt-3 text-sm app-text-danger">{checkoutError}</p>}
+                <p className="mt-2 text-xs app-muted">{copy.secure}</p>
               </div>
             )}
           </div>

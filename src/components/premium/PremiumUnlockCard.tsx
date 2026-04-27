@@ -52,29 +52,29 @@ export default function PremiumUnlockCard({
 
   return (
     <>
-      <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-10 rounded-2xl text-center my-4 shadow-inner">
+      <div className="app-card p-10 text-center my-4">
         <div className="text-4xl mb-4">🔒</div>
-        <h3 className="text-xl font-bold text-slate-800">{copy.title}</h3>
-        <p className="text-slate-600 mb-6 max-w-sm mx-auto">{copy.description}</p>
+        <h3 className="text-xl app-title">{copy.title}</h3>
+        <p className="app-muted mb-6 max-w-sm mx-auto">{copy.description}</p>
         <button
           onClick={() => setIsModalOpen(true)}
           disabled={isCheckoutLoading}
-          className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all hover:scale-105 shadow-lg shadow-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+          className="app-button app-button-primary px-8 py-3"
         >
           {isCheckoutLoading ? copy.loading : copy.button}
         </button>
-        {checkoutError && <p className="text-sm text-red-700 mt-3">{checkoutError}</p>}
-        <p className="text-xs text-slate-400 mt-4 italic">{copy.footer}</p>
+        {checkoutError && <p className="text-sm app-text-danger mt-3">{checkoutError}</p>}
+        <p className="text-xs app-muted mt-4 italic">{copy.footer}</p>
       </div>
 
       <Modal isOpen={isModalOpen} title={copy.modalTitle} onClose={() => setIsModalOpen(false)}>
-        <p className="text-sm text-slate-600 mb-5">{copy.modalBody}</p>
-        {checkoutError && <p className="text-sm text-red-700 mb-4">{checkoutError}</p>}
+        <p className="text-sm app-muted mb-5">{copy.modalBody}</p>
+        {checkoutError && <p className="text-sm app-text-danger mb-4">{checkoutError}</p>}
         <div className="flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={() => setIsModalOpen(false)}
-            className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+            className="app-button app-button-secondary px-4 py-2 text-sm"
           >
             {copy.modalCancel}
           </button>
@@ -82,7 +82,7 @@ export default function PremiumUnlockCard({
             type="button"
             onClick={handleConfirm}
             disabled={isCheckoutLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+            className="app-button app-button-primary px-4 py-2 text-sm"
           >
             {isCheckoutLoading ? copy.loading : copy.modalConfirm}
           </button>

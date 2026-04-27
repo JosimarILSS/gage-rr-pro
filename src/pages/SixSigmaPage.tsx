@@ -400,26 +400,26 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
           : 'Z-Score';
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-5 md:px-6 py-4 shadow-sm">
+    <div className="app-shell">
+      <header className="app-header sticky top-0 z-30 px-5 md:px-6 py-4">
         <div className="max-w-[1600px] mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={onBackToTools}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:text-indigo-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="app-button app-button-secondary px-3 py-2 text-sm"
             >
               <ArrowLeft className="w-4 h-4" />
               {t.back}
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-sm">
+              <div className="app-icon-tile">
                 <TrendingUp size={22} />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-800">{t.title}</h1>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">{t.subtitle}</p>
+                <h1 className="text-xl app-title">{t.title}</h1>
+                <p className="text-xs font-medium app-muted uppercase">{t.subtitle}</p>
               </div>
             </div>
           </div>
@@ -428,18 +428,16 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
             <button
               type="button"
               onClick={onToggleLang}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 cursor-pointer"
+              className="app-button app-button-secondary px-3 py-2 text-xs"
             >
               <Globe className="w-4 h-4" />
               {lang === 'es' ? 'EN' : 'ES'}
             </button>
-            <nav className="flex bg-slate-100 p-1 rounded-lg">
+            <nav className="app-tabs">
               <button
                 type="button"
                 onClick={() => setActiveTab('dashboard')}
-                className={`px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'dashboard' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
+                className={`app-tab ${activeTab === 'dashboard' ? 'app-tab-active' : ''}`}
               >
                 <LayoutDashboard size={18} />
                 {t.dashboard}
@@ -447,9 +445,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
               <button
                 type="button"
                 onClick={() => setActiveTab('config')}
-                className={`px-3 md:px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'config' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
+                className={`app-tab ${activeTab === 'config' ? 'app-tab-active' : ''}`}
               >
                 <Settings size={18} />
                 {t.config}
@@ -469,10 +465,10 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
-              <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm h-fit">
-                <div className="flex items-center gap-2 mb-6 text-slate-800">
-                  <Settings className="text-indigo-600" size={20} />
-                  <h2 className="font-bold text-lg">{t.specLimits}</h2>
+              <div className="app-panel p-6 h-fit">
+                <div className="flex items-center gap-2 mb-6">
+                  <Settings style={{ color: 'var(--app-primary)' }} size={20} />
+                  <h2 className="text-lg app-title">{t.specLimits}</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -482,22 +478,22 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                     { label: t.usl, value: usl, setter: setUsl },
                   ].map((field) => (
                     <label key={field.label} className="block">
-                      <span className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">{field.label}</span>
+                      <span className="app-label">{field.label}</span>
                       <input
                         type="number"
                         value={Number.isNaN(field.value) ? '' : field.value}
                         onChange={(event) => field.setter(parseNumberInput(event.target.value))}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-medium"
+                        className="app-input px-4 py-3 font-medium"
                       />
                     </label>
                   ))}
 
-                  <label className="block pt-4 border-t border-slate-100">
-                    <span className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">{t.subgroupSize}</span>
+                  <label className="block pt-4 border-t app-divider">
+                    <span className="app-label">{t.subgroupSize}</span>
                     <select
                       value={subgroupSize}
                       onChange={(event) => handleSubgroupSizeChange(Number(event.target.value))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-medium cursor-pointer"
+                      className="app-input px-4 py-3 font-medium cursor-pointer"
                     >
                       {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
                         <option key={value} value={value}>
@@ -509,21 +505,21 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 </div>
               </div>
 
-              <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-5 md:p-6 border-b border-slate-100 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between bg-white">
-                  <div className="flex items-center gap-2 text-slate-800">
-                    <TableIcon className="text-indigo-600" size={20} />
-                    <h2 className="font-bold text-lg">{t.dataEntry}</h2>
+              <div className="lg:col-span-2 app-panel overflow-hidden flex flex-col">
+                <div className="p-5 md:p-6 border-b app-divider flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex items-center gap-2">
+                    <TableIcon style={{ color: 'var(--app-primary)' }} size={20} />
+                    <h2 className="text-lg app-title">{t.dataEntry}</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={handleGenerateSample}
-                      className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                      className="app-button app-button-secondary px-3 py-2 text-sm"
                     >
                       {t.sample}
                     </button>
-                    <label className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2">
+                    <label className="app-button app-button-success px-3 py-2 text-sm">
                       <Upload size={17} />
                       {t.excelImport}
                       <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileUpload} />
@@ -531,7 +527,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                     <button
                       type="button"
                       onClick={() => setShowBulkImport(!showBulkImport)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                      className="app-button app-button-secondary px-3 py-2 text-sm"
                     >
                       {t.bulkImport}
                     </button>
@@ -541,14 +537,14 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                         setSubgroups([]);
                         setSelectedDist(undefined);
                       }}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                      className="app-button app-button-danger px-3 py-2 text-sm"
                     >
                       {t.clear}
                     </button>
                     <button
                       type="button"
                       onClick={handleAddSubgroup}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                      className="app-button app-button-primary px-3 py-2 text-sm"
                     >
                       <Plus size={17} />
                       {t.add}
@@ -557,36 +553,36 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 </div>
 
                 {(importError || showBulkImport) && (
-                  <div className="border-b border-slate-100">
+                  <div className="border-b app-divider">
                     <AnimatePresence>
                       {showBulkImport && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          className="p-5 md:p-6 bg-slate-50 overflow-hidden"
+                          className="p-5 md:p-6 overflow-hidden" style={{ background: 'var(--app-bg)' }}
                         >
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">
+                          <label className="app-label">
                             {t.bulkLabel}
                           </label>
                           <textarea
                             value={bulkData}
                             onChange={(event) => setBulkData(event.target.value)}
                             placeholder={'10.1 10.2 9.8 10.0 10.1\n9.9 10.3 10.1 9.7 10.2'}
-                            className="w-full h-32 p-4 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm mb-4"
+                            className="app-input h-32 p-4 font-mono text-sm mb-4"
                           />
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => setShowBulkImport(false)}
-                              className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                              className="app-button app-button-secondary px-4 py-2 text-sm"
                             >
                               {t.cancel}
                             </button>
                             <button
                               type="button"
                               onClick={handleBulkImport}
-                              className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors cursor-pointer"
+                              className="app-button app-button-primary px-5 py-2 text-sm"
                             >
                               {t.import}
                             </button>
@@ -594,17 +590,17 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    {importError && <p className="px-6 pb-4 text-sm text-red-700">{importError}</p>}
+                    {importError && <p className="px-6 pb-4 text-sm app-text-danger">{importError}</p>}
                   </div>
                 )}
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-5 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest w-20">{t.id}</th>
+                      <tr className="app-table-head">
+                        <th className="px-5 py-4 text-xs font-bold uppercase w-20">{t.id}</th>
                         {Array.from({ length: subgroupSize }).map((_, index) => (
-                          <th key={index} className="px-5 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          <th key={index} className="px-5 py-4 text-xs font-bold uppercase">
                             {t.samplePrefix} {index + 1}
                           </th>
                         ))}
@@ -614,7 +610,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                     <tbody className="divide-y divide-slate-50">
                       {subgroups.map((subgroup) => (
                         <tr key={subgroup.id} className="hover:bg-slate-50/70 transition-colors group">
-                          <td className="px-5 py-4 font-mono text-sm text-slate-500 font-bold">#{subgroup.id}</td>
+                          <td className="px-5 py-4 font-mono text-sm app-muted font-bold">#{subgroup.id}</td>
                           {subgroup.values.map((value, index) => (
                             <td key={index} className="px-4 py-2 min-w-32">
                               <input
@@ -622,7 +618,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                                 step="any"
                                 value={Number.isNaN(value) ? '' : value}
                                 onChange={(event) => handleValueChange(subgroup.id, index, event.target.value)}
-                                className="w-full px-3 py-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg transition-all outline-none font-medium text-slate-700"
+                                className="app-input px-3 py-2 font-medium"
                               />
                             </td>
                           ))}
@@ -630,7 +626,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                             <button
                               type="button"
                               onClick={() => handleRemoveSubgroup(subgroup.id)}
-                              className="text-slate-300 hover:text-rose-500 transition-colors p-2 rounded-lg hover:bg-rose-50 cursor-pointer"
+                              className="app-button app-button-danger app-button-icon"
                               aria-label="Remove subgroup"
                             >
                               <Trash2 size={18} />
@@ -673,18 +669,18 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                   interpretationLabel={t.interpretation}
                 />
 
-                <section className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm flex flex-col">
+                <section className="app-panel p-6 flex flex-col">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <h3 className="app-title flex items-center gap-2">
                       <div className="w-2 h-6 bg-blue-500 rounded-full" />
                       {t.probabilityPlot} ({stats?.bestFitDist || 'Normal'})
                     </h3>
-                    <div className="bg-blue-50 px-3 py-1 rounded-lg text-blue-700 text-[10px] font-bold uppercase">
+                    <div className="app-badge app-badge-primary">
                       {t.adPValue}: {adTest.pValue.toFixed(4)}
                     </div>
                   </div>
                   <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                       <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                         <XAxis
@@ -716,15 +712,15 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                   </ChartInterpretation>
                 </section>
 
-                <section className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm flex flex-col">
+                <section className="app-panel p-6 flex flex-col">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                      <div className="w-2 h-6 bg-amber-500 rounded-full" />
+                    <h3 className="app-title flex items-center gap-2">
+                      <div className="w-2 h-6 rounded-full" style={{ background: 'var(--app-chart-warning)' }} />
                       {t.histogram} ({stats?.bestFitDist || 'Normal'})
                     </h3>
                   </div>
                   <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                       <ComposedChart data={histogramData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                         <XAxis dataKey="mid" stroke="#94A3B8" fontSize={10} tickFormatter={(value) => Number(value).toFixed(2)} />
@@ -763,15 +759,15 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
               </div>
 
               {stats && (
-                <section className="bg-indigo-50 rounded-lg border border-indigo-100 p-6">
-                  <div className="flex items-center gap-2 mb-4 text-indigo-800">
+                <section className="app-panel p-6" style={{ background: 'var(--app-primary-soft)', borderColor: 'var(--app-primary-border)' }}>
+                  <div className="flex items-center gap-2 mb-4" style={{ color: 'var(--app-primary-text)' }}>
                     <TrendingUp size={20} />
                     <h2 className="font-bold text-lg">{stats.isNormal && !selectedDist ? t.detailedStats : t.nonNormalStats}</h2>
                   </div>
 
                   {stats.suggestions.length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-3">{t.topDistributions}</h3>
+                      <h3 className="text-xs font-bold uppercase mb-3">{t.topDistributions}</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {stats.suggestions.map((suggestion) => (
                           <button
@@ -780,33 +776,34 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                             onClick={() => setSelectedDist(suggestion.name)}
                             className={`p-3 rounded-lg border transition-all text-left flex flex-col gap-1 cursor-pointer ${
                               stats.bestFitDist === suggestion.name
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                                : 'bg-white border-indigo-100 text-indigo-900 hover:border-indigo-300'
+                                ? 'text-white shadow-sm'
+                                : ''
                             }`}
+                            style={stats.bestFitDist === suggestion.name ? { background: 'var(--app-primary)', borderColor: 'var(--app-primary)' } : { borderColor: 'var(--app-primary-border)', color: 'var(--app-primary-text)' }}
                           >
                             <span className="flex items-center justify-between">
                               <span className="font-bold text-sm">{suggestion.name}</span>
                               {stats.bestFitDist === suggestion.name && <CheckCircle2 size={14} />}
                             </span>
-                            <span className={`text-[10px] ${stats.bestFitDist === suggestion.name ? 'text-indigo-100' : 'text-slate-500'}`}>
+                            <span className="text-[10px]" style={{ color: stats.bestFitDist === suggestion.name ? 'color-mix(in srgb, white 82%, var(--app-primary-soft))' : 'var(--app-text-soft)' }}>
                               p-value: {suggestion.pValue.toFixed(4)}
                             </span>
                           </button>
                         ))}
                       </div>
-                      <p className="mt-3 text-[11px] text-indigo-600 italic">{t.distributionQuestion}</p>
+                      <p className="mt-3 text-[11px] italic" style={{ color: 'var(--app-primary)' }}>{t.distributionQuestion}</p>
                     </div>
                   )}
 
                   {(!stats.isNormal || selectedDist) && (
                     <>
-                      <p className="text-sm text-indigo-700 mb-4">
+                      <p className="text-sm mb-4" style={{ color: 'var(--app-primary-text)' }}>
                         {selectedDist ? `${t.selectedDistribution}: ${selectedDist}` : t.adjustedExplanation}
                       </p>
                       {distributionReason && (
-                        <div className="flex items-start gap-2 bg-white/60 p-3 rounded-lg mb-4 border border-indigo-100/60">
-                          <Info size={16} className="text-indigo-500 mt-0.5 shrink-0" />
-                          <p className="text-xs text-indigo-700 italic">{distributionReason}</p>
+                        <div className="app-callout app-callout-primary flex items-start gap-2 mb-4">
+                          <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--app-primary)' }} />
+                          <p className="text-xs italic" style={{ color: 'var(--app-primary-text)' }}>{distributionReason}</p>
                         </div>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -818,10 +815,10 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 </section>
               )}
 
-              <section className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex items-center gap-2 text-slate-800">
-                  <Info className="text-indigo-600" size={20} />
-                  <h2 className="font-bold text-lg">{t.detailedStats}</h2>
+              <section className="app-panel overflow-hidden">
+                <div className="p-6 border-b app-divider flex items-center gap-2">
+                  <Info style={{ color: 'var(--app-primary)' }} size={20} />
+                  <h2 className="text-lg app-title">{t.detailedStats}</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                   <SummaryBlock title={t.processStats}>
@@ -837,10 +834,10 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                     <SummaryRow
                       label={t.status}
                       value={adTest.pValue > 0.05 ? stats?.bestFitDist || 'Normal' : t.notNormal}
-                      valueClassName={adTest.pValue > 0.05 ? 'text-emerald-600' : 'text-rose-600'}
+                      valueClassName={adTest.pValue > 0.05 ? 'app-text-success' : 'app-text-danger'}
                     />
                     {adTest.pValue <= 0.05 && stats?.bestFitDist && (
-                      <SummaryRow label={t.bestFit} value={stats.bestFitDist} valueClassName="text-indigo-600" />
+                      <SummaryRow label={t.bestFit} value={stats.bestFitDist} valueClassName="app-text-primary" />
                     )}
                   </SummaryBlock>
                   <SummaryBlock title={t.specs}>
@@ -877,19 +874,19 @@ function ControlChartCard({
   interpretation: string;
   interpretationLabel: string;
 }) {
-  const stroke = color === 'indigo' ? '#6366F1' : '#10B981';
-  const barClass = color === 'indigo' ? 'bg-indigo-500' : 'bg-emerald-500';
+  const stroke = color === 'indigo' ? 'var(--app-chart-primary)' : 'var(--app-chart-secondary)';
+  const barStyle = { background: color === 'indigo' ? 'var(--app-chart-primary)' : 'var(--app-chart-secondary)' };
 
   return (
-    <section className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm flex flex-col">
+    <section className="app-panel p-6 flex flex-col">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-          <div className={`w-2 h-6 ${barClass} rounded-full`} />
+        <h3 className="app-title flex items-center gap-2">
+          <div className="w-2 h-6 rounded-full" style={barStyle} />
           {title}
         </h3>
       </div>
       <div className="h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
             <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
@@ -935,9 +932,9 @@ function ControlChartCard({
 
 function ChartInterpretation({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-      <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">{label}</h4>
-      <p className="text-sm text-slate-600">{children}</p>
+    <div className="mt-4 app-status-bar">
+      <h4 className="text-[10px] font-bold uppercase mb-2 app-muted">{label}</h4>
+      <p className="text-sm app-muted">{children}</p>
     </div>
   );
 }
@@ -955,20 +952,23 @@ function MetricCard({
 }) {
   const isOnTarget = Number.isFinite(value) && value! >= target;
   return (
-    <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:border-indigo-200 transition-colors">
+    <div className="app-card app-card-hover p-5 flex flex-col justify-between">
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</span>
-          {isOnTarget ? <CheckCircle2 size={16} className="text-emerald-500" /> : <AlertCircle size={16} className="text-amber-500" />}
+          <span className="text-xs font-bold uppercase app-muted">{label}</span>
+          {isOnTarget ? <CheckCircle2 size={16} className="app-text-success" /> : <AlertCircle size={16} className="app-text-warning" />}
         </div>
-        <div className="text-3xl font-black text-slate-800 tracking-tight">{formatMetric(value)}</div>
+        <div className="text-3xl font-black app-title">{formatMetric(value)}</div>
       </div>
       <div className="mt-4">
-        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{desc}</p>
+        <p className="text-[10px] font-bold uppercase mb-1 app-muted">{desc}</p>
         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
           <div
-            className={`h-full transition-all duration-1000 ${isOnTarget ? 'bg-emerald-500' : 'bg-amber-500'}`}
-            style={{ width: `${Math.min(((value || 0) / 2) * 100, 100)}%` }}
+            className="h-full transition-all duration-1000"
+            style={{
+              width: `${Math.min(((value || 0) / 2) * 100, 100)}%`,
+              background: isOnTarget ? 'var(--app-success)' : 'var(--app-warning)',
+            }}
           />
         </div>
       </div>
@@ -978,10 +978,10 @@ function MetricCard({
 
 function AdjustedMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm">
+    <div className="app-card p-4">
       <div className="flex justify-between items-center gap-4">
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-        <span className="text-2xl font-black text-indigo-600">{formatMetric(value)}</span>
+        <span className="text-sm font-bold uppercase app-muted">{label}</span>
+        <span className="text-2xl font-black" style={{ color: 'var(--app-primary)' }}>{formatMetric(value)}</span>
       </div>
     </div>
   );
@@ -990,7 +990,7 @@ function AdjustedMetric({ label, value }: { label: string; value: number }) {
 function SummaryBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="p-6 space-y-4">
-      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{title}</h4>
+      <h4 className="text-xs font-bold uppercase app-muted">{title}</h4>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -999,7 +999,7 @@ function SummaryBlock({ title, children }: { title: string; children: React.Reac
 function SummaryRow({ label, value, valueClassName = '' }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className="flex justify-between gap-4 text-sm">
-      <span className="text-slate-500">{label}:</span>
+      <span className="app-muted">{label}:</span>
       <span className={`font-bold text-right ${valueClassName}`}>{value}</span>
     </div>
   );
