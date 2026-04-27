@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, BarChart3, CheckCircle2, FileDown, FileSpreadsheet, Globe, Info, LogOut, RotateCcw, Settings, ShieldCheck, Upload, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BarChart3, CheckCircle2, FileDown, FileSpreadsheet, Globe, Info, LogOut, RotateCcw, Settings, ShieldCheck, Upload, Users } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -70,6 +70,7 @@ type AnalysisPageProps = {
   checkoutError: string | null;
   onUnlockPremium: () => Promise<void>;
   workspace: UseGageRRWorkspaceResult;
+  onBackToTools?: () => void;
   showAdminAccessButton?: boolean;
   onGoToAdminAccess?: () => void;
 };
@@ -84,6 +85,7 @@ export default function AnalysisPage({
   checkoutError,
   onUnlockPremium,
   workspace,
+  onBackToTools,
   showAdminAccessButton = false,
   onGoToAdminAccess,
 }: AnalysisPageProps) {
@@ -155,6 +157,16 @@ export default function AnalysisPage({
       sidebar={
         <>
         <div>
+          {onBackToTools && (
+            <button
+              type="button"
+              onClick={onBackToTools}
+              className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-indigo-700 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {lang === 'es' ? 'Volver a herramientas' : 'Back to tools'}
+            </button>
+          )}
           <div className="flex justify-between items-start mb-4 pr-12 md:pr-0">
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <BarChart3 className="text-indigo-600" />

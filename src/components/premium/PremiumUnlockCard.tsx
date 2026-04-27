@@ -21,26 +21,26 @@ export default function PremiumUnlockCard({
     es: {
       title: 'Interpretación Profesional Lista',
       description:
-        'Los cálculos de ANOVA se han completado. Para desbloquear el diagnóstico detallado y las recomendaciones de acción, adquiere tu acceso permanente.',
+        'Los cálculos de ANOVA se han completado. Para desbloquear el diagnóstico detallado y las recomendaciones de acción, adquiere acceso premium por 6 meses.',
       button: 'Desbloquear por 150 MXN',
       loading: 'Abriendo checkout...',
       footer: 'Pago seguro vía Stripe',
       modalTitle: 'Confirmar Compra',
       modalBody:
-        'Vas a abrir Stripe Checkout para pagar 150 MXN. Al confirmar el pago, tu cuenta se marcará como premium automáticamente.',
+        'Vas a abrir Stripe Checkout para pagar 150 MXN por 6 meses de acceso premium. Al confirmar el pago, tu cuenta se marcará como premium automáticamente.',
       modalCancel: 'Cancelar',
       modalConfirm: 'Continuar a pago',
     },
     en: {
       title: 'Professional Interpretation Ready',
       description:
-        'ANOVA calculations are complete. To unlock detailed diagnostics and action recommendations, purchase your lifetime access.',
+        'ANOVA calculations are complete. To unlock detailed diagnostics and action recommendations, purchase 6 months of premium access.',
       button: 'Unlock for 150 MXN',
       loading: 'Opening checkout...',
       footer: 'Secure Stripe payment',
       modalTitle: 'Confirm Purchase',
       modalBody:
-        'You are about to open Stripe Checkout for 150 MXN. Once paid, your account will be marked as premium automatically.',
+        'You are about to open Stripe Checkout for 150 MXN for 6 months of premium access. Once paid, your account will be marked as premium automatically.',
       modalCancel: 'Cancel',
       modalConfirm: 'Continue to payment',
     },
@@ -91,4 +91,3 @@ export default function PremiumUnlockCard({
     </>
   );
 }
-

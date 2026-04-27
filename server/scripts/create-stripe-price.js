@@ -6,7 +6,7 @@ if (!STRIPE_SECRET_KEY) {
   throw new Error('Missing STRIPE_SECRET_KEY in environment.');
 }
 
-const PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium de por vida - Gage RR Pro';
+const PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium por 6 meses - Gage RR Pro';
 const PRODUCT_ID = process.env.STRIPE_PRODUCT_ID;
 const UNIT_AMOUNT = Number(process.env.STRIPE_AMOUNT_MXN || 15000);
 const CURRENCY = (process.env.STRIPE_CURRENCY || 'mxn').toLowerCase();
@@ -48,4 +48,3 @@ main().catch((error) => {
   console.error('Failed to create Stripe price:', error);
   process.exit(1);
 });
-

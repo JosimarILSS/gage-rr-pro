@@ -15,13 +15,18 @@ const parseJsonResponse = async (response: Response): Promise<any> => {
   }
 };
 
-export const createCheckoutSession = async (apiBaseUrl: string, idToken: string): Promise<CheckoutSessionPayload> => {
+export const createCheckoutSession = async (
+  apiBaseUrl: string,
+  idToken: string,
+  returnPath = '/'
+): Promise<CheckoutSessionPayload> => {
   const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
     },
+    body: JSON.stringify({ returnPath }),
   });
 
   const payload = await parseJsonResponse(response);
@@ -52,4 +57,3 @@ export const getCheckoutErrorMessage = (lang: Lang): string =>
   lang === 'es'
     ? 'No se pudo iniciar el pago. Inténtalo de nuevo en unos segundos.'
     : 'Could not start checkout. Please try again in a few seconds.';
-

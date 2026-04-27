@@ -3,6 +3,89 @@ import type { User } from 'firebase/auth';
 import { db } from '../firebase';
 import type { Lang } from '../types/common';
 
+export type UserAccountProfile = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  premium: boolean;
+  premiumActive: boolean;
+  premiumUnlimited: boolean;
+  premiumGrantedAt: number | null;
+  premiumExpiresAt: number | null;
+  createdAt: number | null;
+};
+
+const toTimestampMs = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  if (typeof value === 'object') {
+    const maybeTimestamp = value as { toMillis?: () => number; seconds?: number; nanoseconds?: number };
+    if (typeof maybeTimestamp.toMillis === 'function') return maybeTimestamp.toMillis();
+    if (typeof maybeTimestamp.seconds === 'number') {
+      return maybeTimestamp.seconds * 1000 + Math.floor((maybeTimestamp.nanoseconds || 0) / 1000000);
+    }
+  }
+
+  return null;
+};
+
+const buildProfile = (
+  user: User,
+  data: Record<string, unknown> = {},
+  claims: Record<string, unknown> = {}
+): UserAccountProfile => {
+  const hasFirestorePremium = typeof data.premium === 'boolean';
+  const hasFirestoreExpiration = Object.prototype.hasOwnProperty.call(data, 'premiumExpiresAt');
+  const hasFirestoreGrantedAt = Object.prototype.hasOwnProperty.call(data, 'premiumGrantedAt');
+  const expirationRaw = hasFirestoreExpiration ? data.premiumExpiresAt : claims.premiumExpiresAt;
+  const grantedAtRaw = hasFirestoreGrantedAt ? data.premiumGrantedAt : claims.premiumUpdatedAt;
+  const premium = hasFirestorePremium ? data.premium === true : claims.premium === true;
+  const premiumExpiresAt = toTimestampMs(expirationRaw);
+  const premiumGrantedAt = toTimestampMs(grantedAtRaw);
+  const createdAt = toTimestampMs(data.createdAt);
+  const premiumUnlimited = premium && (expirationRaw === null || expirationRaw === undefined);
+  const premiumActive = premium && (premiumUnlimited || (premiumExpiresAt !== null && Date.now() < premiumExpiresAt));
+
+  return {
+    uid: user.uid,
+    email: (data.email as string | null | undefined) || user.email || null,
+    displayName: (data.displayName as string | null | undefined) || user.displayName || null,
+    photoURL: (data.photoURL as string | null | undefined) || user.photoURL || null,
+    premium,
+    premiumActive,
+    premiumUnlimited,
+    premiumGrantedAt,
+    premiumExpiresAt,
+    createdAt,
+  };
+};
+
+export const getUserAccountProfile = async (user: User | null): Promise<UserAccountProfile | null> => {
+  if (!user) return null;
+
+  try {
+    const snap = await getDoc(doc(db, 'usuarios', user.uid));
+    if (snap.exists()) return buildProfile(user, snap.data());
+  } catch {
+    // Si Firestore falla, se usa Custom Claims como respaldo.
+  }
+
+  try {
+    const tokenResult = await user.getIdTokenResult(true);
+    return buildProfile(user, {}, tokenResult.claims as Record<string, unknown>);
+  } catch {
+    return buildProfile(user);
+  }
+};
+
 /**
  * Verifica el acceso premium leyendo Firestore directamente.
  *
@@ -13,34 +96,8 @@ import type { Lang } from '../types/common';
  * - premium === true && premiumExpiresAt <= ahora → acceso expirado
  */
 export const checkPremiumStatus = async (user: User | null): Promise<boolean> => {
-  if (!user) return false;
-
-  try {
-    const snap = await getDoc(doc(db, 'usuarios', user.uid));
-    if (!snap.exists()) {
-      // Documento aún no creado — fallback al Custom Claim
-      const tokenResult = await user.getIdTokenResult(true);
-      return tokenResult.claims?.premium === true;
-    }
-
-    const data = snap.data();
-
-    if (!data.premium) return false;
-
-    // null = acceso manual ilimitado
-    if (data.premiumExpiresAt === null || data.premiumExpiresAt === undefined) return true;
-
-    // Comparar timestamp de Firestore con la fecha actual
-    const expiresMs: number = data.premiumExpiresAt.toMillis
-      ? data.premiumExpiresAt.toMillis()
-      : Number(data.premiumExpiresAt);
-
-    return Date.now() < expiresMs;
-  } catch {
-    // Si Firestore falla, no bloquear al usuario — usar claim como respaldo
-    const tokenResult = await user.getIdTokenResult(true);
-    return tokenResult.claims?.premium === true;
-  }
+  const profile = await getUserAccountProfile(user);
+  return profile?.premiumActive === true;
 };
 
 export const getAuthErrorMessage = (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   GoogleAuthProvider,
@@ -15,7 +15,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
-import { checkPremiumStatus, getAuthErrorMessage } from '../services/auth';
+import { getAuthErrorMessage, getUserAccountProfile, type UserAccountProfile } from '../services/auth';
 import {
   confirmCheckoutSession,
   createCheckoutSession,
@@ -25,6 +25,7 @@ import type { Lang } from '../types/common';
 
 type UseAuthSessionResult = {
   user: User | null;
+  accountProfile: UserAccountProfile | null;
   signInProvider: string | null;
   loadingAuth: boolean;
   esPremium: boolean;
@@ -46,6 +47,7 @@ type PendingGoogleLink = {
 
 export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const [user, setUser] = useState<User | null>(null);
+  const [accountProfile, setAccountProfile] = useState<UserAccountProfile | null>(null);
   const [signInProvider, setSignInProvider] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [esPremium, setEsPremium] = useState(false);
@@ -61,12 +63,21 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     []
   );
 
+  const refreshAccountProfile = useCallback(async (targetUser: User | null) => {
+    const profile = await getUserAccountProfile(targetUser);
+    setAccountProfile(profile);
+    setEsPremium(profile?.premiumActive === true);
+    return profile;
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
       if (!currentUser) {
+        setAccountProfile(null);
         setSignInProvider(null);
+        setEsPremium(false);
         setLoadingAuth(false);
         return;
       }
@@ -89,20 +100,13 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
         });
       } catch {
         // Silencioso para no exponer detalles internos al cliente.
+      } finally {
+        await refreshAccountProfile(currentUser);
       }
     });
 
     return () => unsubscribe();
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
-    const refreshPremium = async () => {
-      const premium = await checkPremiumStatus(user);
-      setEsPremium(premium);
-    };
-
-    refreshPremium();
-  }, [user]);
+  }, [apiBaseUrl, refreshAccountProfile]);
 
   useEffect(() => {
     const syncCheckoutReturn = async () => {
@@ -119,8 +123,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
           await confirmCheckoutSession(apiBaseUrl, token, sessionId);
         }
 
-        const premium = await checkPremiumStatus(user);
-        setEsPremium(premium);
+        await refreshAccountProfile(user);
       } catch {
         // Silencioso para no exponer detalles internos al cliente.
       } finally {
@@ -132,7 +135,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     };
 
     syncCheckoutReturn();
-  }, [apiBaseUrl, user]);
+  }, [apiBaseUrl, refreshAccountProfile, user]);
 
   const clearPendingGoogleLinkIfUnmatched = (email: string) => {
     if (!pendingGoogleLink) return;
@@ -355,10 +358,10 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     setIsCheckoutLoading(true);
     try {
       const token = await user.getIdToken();
-      const payload = await createCheckoutSession(apiBaseUrl, token);
+      const payload = await createCheckoutSession(apiBaseUrl, token, window.location.pathname);
 
       if (payload?.alreadyPaid) {
-        setEsPremium(true);
+        await refreshAccountProfile(user);
         return;
       }
 
@@ -376,6 +379,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
 
   return {
     user,
+    accountProfile,
     signInProvider,
     loadingAuth,
     esPremium,

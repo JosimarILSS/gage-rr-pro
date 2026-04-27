@@ -5,6 +5,16 @@ const { verifyFirebaseToken } = require('../_firebase.js');
 const { getApps } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 
+const normalizeReturnPath = (value) => {
+  if (typeof value !== 'string') return '/';
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('://')) return '/';
+
+  const pathname = trimmed.split('?')[0].split('#')[0];
+  return pathname || '/';
+};
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -15,7 +25,7 @@ module.exports = async function handler(req, res) {
   const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
   const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
   const STRIPE_AMOUNT_MXN = Number(process.env.STRIPE_AMOUNT_MXN || 15000);
-  const STRIPE_PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium de por vida - Gage RR Pro';
+  const STRIPE_PRODUCT_NAME = process.env.STRIPE_PRODUCT_NAME || 'Acceso premium por 6 meses - Gage RR Pro';
 
   console.log('[create-checkout] STRIPE_SECRET_KEY present:', !!STRIPE_SECRET_KEY);
   console.log('[create-checkout] STRIPE_PUBLISHABLE_KEY present:', !!STRIPE_PUBLISHABLE_KEY);
@@ -42,8 +52,9 @@ module.exports = async function handler(req, res) {
     }
 
     const origin = req.headers.origin || process.env.APP_URL || 'https://gage-rr-pro.vercel.app';
-    const successUrl = `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${origin}/?checkout=cancel`;
+    const returnPath = normalizeReturnPath(req.body?.returnPath);
+    const successUrl = `${origin}${returnPath}?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${origin}${returnPath}?checkout=cancel`;
 
     const lineItems = STRIPE_PRICE_ID
       ? [{ price: STRIPE_PRICE_ID, quantity: 1 }]
