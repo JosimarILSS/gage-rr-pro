@@ -4,12 +4,10 @@ import readXlsxFile from 'read-excel-file/browser';
 import {
   AlertCircle,
   ArrowLeft,
-  BarChart3,
   CheckCircle2,
   FileSpreadsheet,
   Globe,
   Info,
-  LayoutDashboard,
   Plus,
   Settings,
   Table as TableIcon,
@@ -32,6 +30,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import SidebarLayout from '../layouts/SidebarLayout';
 import {
   calculateAndersonDarling,
   calculateCapability,
@@ -264,7 +263,6 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
   const [nominal, setNominal] = useState<number>(10);
   const [subgroupSize, setSubgroupSize] = useState<number>(5);
   const [subgroups, setSubgroups] = useState<SubgroupData[]>(createInitialSubgroups);
-  const [activeTab, setActiveTab] = useState<'config' | 'dashboard'>('dashboard');
   const [selectedDist, setSelectedDist] = useState<string | undefined>(undefined);
   const [bulkData, setBulkData] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -398,460 +396,479 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
         : stats?.bestFitDist === 'Logistic'
           ? 'Log(p/(1-p))'
           : 'Z-Score';
+  const metricItems = [
+    { label: 'Cp', value: stats?.cp, target: 1.33, desc: t.cp },
+    { label: 'Cpk', value: stats?.cpk, target: 1.33, desc: t.cpk },
+    { label: 'Pp', value: stats?.pp, target: 1.33, desc: t.pp },
+    { label: 'Ppk', value: stats?.ppk, target: 1.33, desc: t.ppk },
+    { label: 'Cpm', value: stats?.cpm, target: 1.33, desc: t.cpm },
+  ].filter((item) => (stats?.isNormal ? true : item.label === 'Pp' || item.label === 'Ppk'));
+  const validMeasurementCount = allData.filter((value) => Number.isFinite(value)).length;
 
   return (
-    <div className="app-shell">
-      <header className="app-header sticky top-0 z-30 px-5 md:px-6 py-4">
-        <div className="max-w-[1600px] mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-4">
+    <SidebarLayout
+      mobileSidebarCollapsed={subgroups.length > 0}
+      sidebarClassName="md:!w-[420px] md:!max-w-[420px]"
+      mainClassName="md:p-6 xl:p-8"
+      sidebar={
+        <>
+          <div>
             <button
               type="button"
               onClick={onBackToTools}
-              className="app-button app-button-secondary px-3 py-2 text-sm"
+              className="app-button app-button-secondary mb-5 px-3 py-2 text-sm"
             >
               <ArrowLeft className="w-4 h-4" />
               {t.back}
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="app-icon-tile">
-                <TrendingUp size={22} />
+            <div className="flex items-start justify-between gap-3 pr-12 md:pr-0">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="app-icon-tile shrink-0">
+                  <TrendingUp size={22} />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-xl app-title">{t.title}</h1>
+                  <p className="text-xs font-medium app-muted uppercase">{t.subtitle}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl app-title">{t.title}</h1>
-                <p className="text-xs font-medium app-muted uppercase">{t.subtitle}</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={onToggleLang}
+                className="app-button app-button-secondary shrink-0 px-3 py-2 text-xs"
+              >
+                <Globe className="w-4 h-4" />
+                {lang === 'es' ? 'EN' : 'ES'}
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <section className="space-y-4">
+            <h2 className="app-label flex items-center gap-2">
+              <Settings className="h-4 w-4 app-text-primary" />
+              {t.specLimits}
+            </h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: t.lsl, value: lsl, setter: setLsl },
+                { label: t.nominal, value: nominal, setter: setNominal },
+                { label: t.usl, value: usl, setter: setUsl },
+              ].map((field) => (
+                <label key={field.label} className="block">
+                  <span className="app-label">{field.label}</span>
+                  <input
+                    type="number"
+                    value={Number.isNaN(field.value) ? '' : field.value}
+                    onChange={(event) => field.setter(parseNumberInput(event.target.value))}
+                    className="app-input px-3 py-2.5 text-sm font-medium"
+                  />
+                </label>
+              ))}
+              <label className="block">
+                <span className="app-label">{t.subgroupSize}</span>
+                <select
+                  value={subgroupSize}
+                  onChange={(event) => handleSubgroupSizeChange(Number(event.target.value))}
+                  className="app-input px-3 py-2.5 text-sm font-medium cursor-pointer"
+                >
+                  {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section id="print-sidebar-hide" className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="app-label flex items-center gap-2">
+                <TableIcon className="h-4 w-4 app-text-primary" />
+                {t.dataEntry}
+              </h2>
+              <span className="app-badge app-badge-primary">{validMeasurementCount}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleGenerateSample}
+                className="app-button app-button-secondary px-3 py-2 text-xs"
+              >
+                {t.sample}
+              </button>
+              <button
+                type="button"
+                onClick={handleAddSubgroup}
+                className="app-button app-button-primary px-3 py-2 text-xs"
+              >
+                <Plus size={15} />
+                {t.add}
+              </button>
+              <label className="app-button app-button-success px-3 py-2 text-xs">
+                <Upload size={15} />
+                {t.excelImport}
+                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileUpload} />
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="app-button app-button-secondary px-3 py-2 text-xs"
+              >
+                {t.bulkImport}
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={onToggleLang}
-              className="app-button app-button-secondary px-3 py-2 text-xs"
+              onClick={() => {
+                setSubgroups([]);
+                setSelectedDist(undefined);
+              }}
+              className="app-button app-button-danger w-full px-3 py-2 text-xs"
             >
-              <Globe className="w-4 h-4" />
-              {lang === 'es' ? 'EN' : 'ES'}
+              {t.clear}
             </button>
-            <nav className="app-tabs">
-              <button
-                type="button"
-                onClick={() => setActiveTab('dashboard')}
-                className={`app-tab ${activeTab === 'dashboard' ? 'app-tab-active' : ''}`}
-              >
-                <LayoutDashboard size={18} />
-                {t.dashboard}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('config')}
-                className={`app-tab ${activeTab === 'config' ? 'app-tab-active' : ''}`}
-              >
-                <Settings size={18} />
+
+            <AnimatePresence>
+              {showBulkImport && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="app-callout">
+                    <label className="app-label">{t.bulkLabel}</label>
+                    <textarea
+                      value={bulkData}
+                      onChange={(event) => setBulkData(event.target.value)}
+                      placeholder={'10.1 10.2 9.8 10.0 10.1\n9.9 10.3 10.1 9.7 10.2'}
+                      className="app-input mb-3 h-28 p-3 font-mono text-xs"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkImport(false)}
+                        className="app-button app-button-secondary px-3 py-2 text-xs"
+                      >
+                        {t.cancel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBulkImport}
+                        className="app-button app-button-primary px-3 py-2 text-xs"
+                      >
+                        {t.import}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {importError && <p className="text-sm app-text-danger">{importError}</p>}
+          </section>
+
+          <section className="min-h-0 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="app-label flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4 app-text-primary" />
                 {t.config}
-              </button>
-            </nav>
+              </h2>
+              <span className="app-badge">{subgroups.length}</span>
+            </div>
+
+            <div className="app-table-shell max-h-[44vh] overflow-auto">
+              <table className="min-w-[360px] w-full text-left text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="app-table-head">
+                    <th className="px-3 py-3 text-xs font-bold uppercase w-16">{t.id}</th>
+                    {Array.from({ length: subgroupSize }).map((_, index) => (
+                      <th key={index} className="px-2 py-3 text-xs font-bold uppercase min-w-24">
+                        {index + 1}
+                      </th>
+                    ))}
+                    <th className="px-2 py-3 w-12" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {subgroups.map((subgroup) => (
+                    <tr key={subgroup.id}>
+                      <td className="px-3 py-2 font-mono text-xs app-muted font-bold">#{subgroup.id}</td>
+                      {subgroup.values.map((value, index) => (
+                        <td key={index} className="px-2 py-2">
+                          <input
+                            type="number"
+                            step="any"
+                            value={Number.isNaN(value) ? '' : value}
+                            onChange={(event) => handleValueChange(subgroup.id, index, event.target.value)}
+                            className="app-input px-2 py-2 text-xs font-medium"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSubgroup(subgroup.id)}
+                          className="app-button app-button-danger h-8 w-8"
+                          aria-label="Remove subgroup"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!subgroups.length && (
+                    <tr>
+                      <td colSpan={subgroupSize + 2} className="px-3 py-8 text-center text-sm app-muted">
+                        {lang === 'es' ? 'Agrega o importa datos para analizar.' : 'Add or import data to analyze.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      }
+    >
+      <div className="mx-auto max-w-[1500px] space-y-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-2xl app-title">{t.dashboard}</h2>
+            <p className="text-sm app-muted">{t.subtitle}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="app-badge app-badge-primary">{validMeasurementCount} {t.data}</span>
+            <span className="app-badge">LSL {Number.isNaN(lsl) ? '-' : lsl}</span>
+            <span className="app-badge">USL {Number.isNaN(usl) ? '-' : usl}</span>
           </div>
         </div>
-      </header>
 
-      <main className="p-5 md:p-6 max-w-[1600px] mx-auto">
-        <AnimatePresence mode="wait">
-          {activeTab === 'config' ? (
-            <motion.div
-              key="config"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-            >
-              <div className="app-panel p-6 h-fit">
-                <div className="flex items-center gap-2 mb-6">
-                  <Settings style={{ color: 'var(--app-primary)' }} size={20} />
-                  <h2 className="text-lg app-title">{t.specLimits}</h2>
-                </div>
+        {!stats ? (
+          <section className="app-panel p-8 text-center">
+            <FileSpreadsheet className="mx-auto mb-4 h-12 w-12 app-icon-muted" />
+            <h3 className="text-lg app-title">
+              {lang === 'es' ? 'Sin datos para analizar' : 'No data to analyze'}
+            </h3>
+            <p className="mt-2 text-sm app-muted">
+              {lang === 'es'
+                ? 'Agrega datos desde el panel izquierdo para generar gráficas y capacidad.'
+                : 'Add data from the left panel to generate charts and capability metrics.'}
+            </p>
+          </section>
+        ) : (
+          <>
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${stats.isNormal ? 'xl:grid-cols-5' : 'xl:grid-cols-2'} gap-4`}>
+              {metricItems.map((item) => (
+                <MetricCard key={item.label} {...item} />
+              ))}
+            </div>
 
-                <div className="space-y-5">
-                  {[
-                    { label: t.lsl, value: lsl, setter: setLsl },
-                    { label: t.nominal, value: nominal, setter: setNominal },
-                    { label: t.usl, value: usl, setter: setUsl },
-                  ].map((field) => (
-                    <label key={field.label} className="block">
-                      <span className="app-label">{field.label}</span>
-                      <input
-                        type="number"
-                        value={Number.isNaN(field.value) ? '' : field.value}
-                        onChange={(event) => field.setter(parseNumberInput(event.target.value))}
-                        className="app-input px-4 py-3 font-medium"
-                      />
-                    </label>
-                  ))}
-
-                  <label className="block pt-4 border-t app-divider">
-                    <span className="app-label">{t.subgroupSize}</span>
-                    <select
-                      value={subgroupSize}
-                      onChange={(event) => handleSubgroupSizeChange(Number(event.target.value))}
-                      className="app-input px-4 py-3 font-medium cursor-pointer"
-                    >
-                      {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+            <section className="app-panel p-6" style={{ background: 'var(--app-primary-soft)', borderColor: 'var(--app-primary-border)' }}>
+              <div className="flex items-center gap-2 mb-4" style={{ color: 'var(--app-primary-text)' }}>
+                <TrendingUp size={20} />
+                <h2 className="font-bold text-lg">{stats.isNormal && !selectedDist ? t.detailedStats : t.nonNormalStats}</h2>
               </div>
 
-              <div className="lg:col-span-2 app-panel overflow-hidden flex flex-col">
-                <div className="p-5 md:p-6 border-b app-divider flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-2">
-                    <TableIcon style={{ color: 'var(--app-primary)' }} size={20} />
-                    <h2 className="text-lg app-title">{t.dataEntry}</h2>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleGenerateSample}
-                      className="app-button app-button-secondary px-3 py-2 text-sm"
-                    >
-                      {t.sample}
-                    </button>
-                    <label className="app-button app-button-success px-3 py-2 text-sm">
-                      <Upload size={17} />
-                      {t.excelImport}
-                      <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkImport(!showBulkImport)}
-                      className="app-button app-button-secondary px-3 py-2 text-sm"
-                    >
-                      {t.bulkImport}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSubgroups([]);
-                        setSelectedDist(undefined);
-                      }}
-                      className="app-button app-button-danger px-3 py-2 text-sm"
-                    >
-                      {t.clear}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddSubgroup}
-                      className="app-button app-button-primary px-3 py-2 text-sm"
-                    >
-                      <Plus size={17} />
-                      {t.add}
-                    </button>
-                  </div>
-                </div>
-
-                {(importError || showBulkImport) && (
-                  <div className="border-b app-divider">
-                    <AnimatePresence>
-                      {showBulkImport && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="p-5 md:p-6 overflow-hidden" style={{ background: 'var(--app-bg)' }}
-                        >
-                          <label className="app-label">
-                            {t.bulkLabel}
-                          </label>
-                          <textarea
-                            value={bulkData}
-                            onChange={(event) => setBulkData(event.target.value)}
-                            placeholder={'10.1 10.2 9.8 10.0 10.1\n9.9 10.3 10.1 9.7 10.2'}
-                            className="app-input h-32 p-4 font-mono text-sm mb-4"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowBulkImport(false)}
-                              className="app-button app-button-secondary px-4 py-2 text-sm"
-                            >
-                              {t.cancel}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleBulkImport}
-                              className="app-button app-button-primary px-5 py-2 text-sm"
-                            >
-                              {t.import}
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    {importError && <p className="px-6 pb-4 text-sm app-text-danger">{importError}</p>}
-                  </div>
-                )}
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="app-table-head">
-                        <th className="px-5 py-4 text-xs font-bold uppercase w-20">{t.id}</th>
-                        {Array.from({ length: subgroupSize }).map((_, index) => (
-                          <th key={index} className="px-5 py-4 text-xs font-bold uppercase">
-                            {t.samplePrefix} {index + 1}
-                          </th>
-                        ))}
-                        <th className="px-5 py-4 w-16" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {subgroups.map((subgroup) => (
-                        <tr key={subgroup.id} className="hover:bg-slate-50/70 transition-colors group">
-                          <td className="px-5 py-4 font-mono text-sm app-muted font-bold">#{subgroup.id}</td>
-                          {subgroup.values.map((value, index) => (
-                            <td key={index} className="px-4 py-2 min-w-32">
-                              <input
-                                type="number"
-                                step="any"
-                                value={Number.isNaN(value) ? '' : value}
-                                onChange={(event) => handleValueChange(subgroup.id, index, event.target.value)}
-                                className="app-input px-3 py-2 font-medium"
-                              />
-                            </td>
-                          ))}
-                          <td className="px-5 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSubgroup(subgroup.id)}
-                              className="app-button app-button-danger app-button-icon"
-                              aria-label="Remove subgroup"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <ControlChartCard
-                  title={subgroupSize === 1 ? t.iTitle : t.xBarTitle}
-                  color="indigo"
-                  data={controlCharts?.xBar.points || []}
-                  cl={controlCharts?.xBar.cl}
-                  ucl={controlCharts?.xBar.ucl}
-                  lcl={controlCharts?.xBar.lcl}
-                  interpretation={controlCharts?.xBar.points.some((point) => point.isOutlier) ? t.outOfControl : t.inControl}
-                  interpretationLabel={t.interpretation}
-                />
-                <ControlChartCard
-                  title={subgroupSize === 1 ? t.mrTitle : t.rTitle}
-                  color="emerald"
-                  data={controlCharts?.rChart.points || []}
-                  cl={controlCharts?.rChart.cl}
-                  ucl={controlCharts?.rChart.ucl}
-                  lcl={controlCharts?.rChart.lcl}
-                  interpretation={controlCharts?.rChart.points.some((point) => point.isOutlier) ? t.outOfControl : t.inControl}
-                  interpretationLabel={t.interpretation}
-                />
-
-                <section className="app-panel p-6 flex flex-col">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <h3 className="app-title flex items-center gap-2">
-                      <div className="w-2 h-6 bg-blue-500 rounded-full" />
-                      {t.probabilityPlot} ({stats?.bestFitDist || 'Normal'})
-                    </h3>
-                    <div className="app-badge app-badge-primary">
-                      {t.adPValue}: {adTest.pValue.toFixed(4)}
-                    </div>
-                  </div>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
-                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis
-                          type="number"
-                          dataKey="val"
-                          name={t.observedValue}
-                          stroke="#94A3B8"
-                          fontSize={12}
-                          domain={['auto', 'auto']}
-                          label={{ value: chartLabelX, position: 'bottom', offset: 0, fontSize: 10, fontWeight: 'bold' }}
-                        />
-                        <YAxis
-                          type="number"
-                          dataKey="z"
-                          name={t.probability}
-                          stroke="#94A3B8"
-                          fontSize={12}
-                          label={{ value: chartLabelY, angle: -90, position: 'left', fontSize: 10, fontWeight: 'bold' }}
-                        />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                        <Scatter name={t.data} data={probPlotData} fill="#3B82F6" />
-                      </ScatterChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartInterpretation label={t.interpretation}>
-                    {adTest.pValue > 0.05
-                      ? `${lang === 'es' ? 'Los datos parecen seguir una distribución' : 'The data appears to follow a'} ${stats?.bestFitDist || 'Normal'}.`
-                      : `${lang === 'es' ? 'Los datos no parecen seguir una distribución' : 'The data does not appear to follow a'} ${stats?.bestFitDist || 'Normal'}.`}
-                  </ChartInterpretation>
-                </section>
-
-                <section className="app-panel p-6 flex flex-col">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="app-title flex items-center gap-2">
-                      <div className="w-2 h-6 rounded-full" style={{ background: 'var(--app-chart-warning)' }} />
-                      {t.histogram} ({stats?.bestFitDist || 'Normal'})
-                    </h3>
-                  </div>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
-                      <ComposedChart data={histogramData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                        <XAxis dataKey="mid" stroke="#94A3B8" fontSize={10} tickFormatter={(value) => Number(value).toFixed(2)} />
-                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                        {!Number.isNaN(lsl) && (
-                          <ReferenceLine x={lsl} stroke="#F43F5E" strokeWidth={2} label={{ position: 'top', value: 'LSL', fill: '#F43F5E', fontSize: 10, fontWeight: 'bold' }} />
-                        )}
-                        {!Number.isNaN(usl) && (
-                          <ReferenceLine x={usl} stroke="#F43F5E" strokeWidth={2} label={{ position: 'top', value: 'USL', fill: '#F43F5E', fontSize: 10, fontWeight: 'bold' }} />
-                        )}
-                        <Bar dataKey="count" fill="#FDE68A" radius={[4, 4, 0, 0]} />
-                        <Line type="monotone" dataKey="curve" stroke="#D97706" strokeWidth={2} dot={false} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartInterpretation label={t.interpretation}>
-                    {stats && stats.ppk >= 1.33 ? t.capable : t.notCapable} {isCentered ? t.centered : t.notCentered}{' '}
-                    {t.curveBasedOn}: {stats?.bestFitDist || 'Normal'}
-                  </ChartInterpretation>
-                </section>
-              </div>
-
-              <div className={`grid grid-cols-1 md:grid-cols-2 ${stats?.isNormal ? 'xl:grid-cols-5' : 'xl:grid-cols-2'} gap-4`}>
-                {[
-                  { label: 'Cp', value: stats?.cp, target: 1.33, desc: t.cp },
-                  { label: 'Cpk', value: stats?.cpk, target: 1.33, desc: t.cpk },
-                  { label: 'Pp', value: stats?.pp, target: 1.33, desc: t.pp },
-                  { label: 'Ppk', value: stats?.ppk, target: 1.33, desc: t.ppk },
-                  { label: 'Cpm', value: stats?.cpm, target: 1.33, desc: t.cpm },
-                ]
-                  .filter((item) => (stats?.isNormal ? true : item.label === 'Pp' || item.label === 'Ppk'))
-                  .map((item) => (
-                    <MetricCard key={item.label} {...item} />
-                  ))}
-              </div>
-
-              {stats && (
-                <section className="app-panel p-6" style={{ background: 'var(--app-primary-soft)', borderColor: 'var(--app-primary-border)' }}>
-                  <div className="flex items-center gap-2 mb-4" style={{ color: 'var(--app-primary-text)' }}>
-                    <TrendingUp size={20} />
-                    <h2 className="font-bold text-lg">{stats.isNormal && !selectedDist ? t.detailedStats : t.nonNormalStats}</h2>
-                  </div>
-
-                  {stats.suggestions.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-xs font-bold uppercase mb-3">{t.topDistributions}</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {stats.suggestions.map((suggestion) => (
-                          <button
-                            key={suggestion.name}
-                            type="button"
-                            onClick={() => setSelectedDist(suggestion.name)}
-                            className={`p-3 rounded-lg border transition-all text-left flex flex-col gap-1 cursor-pointer ${
+              {stats.suggestions.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-bold uppercase mb-3">{t.topDistributions}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {stats.suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.name}
+                        type="button"
+                        onClick={() => setSelectedDist(suggestion.name)}
+                        className={`p-3 rounded-lg border transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                          stats.bestFitDist === suggestion.name ? 'text-white shadow-sm' : ''
+                        }`}
+                        style={
+                          stats.bestFitDist === suggestion.name
+                            ? { background: 'var(--app-primary)', borderColor: 'var(--app-primary)' }
+                            : { borderColor: 'var(--app-primary-border)', color: 'var(--app-primary-text)' }
+                        }
+                      >
+                        <span className="flex items-center justify-between">
+                          <span className="font-bold text-sm">{suggestion.name}</span>
+                          {stats.bestFitDist === suggestion.name && <CheckCircle2 size={14} />}
+                        </span>
+                        <span
+                          className="text-[10px]"
+                          style={{
+                            color:
                               stats.bestFitDist === suggestion.name
-                                ? 'text-white shadow-sm'
-                                : ''
-                            }`}
-                            style={stats.bestFitDist === suggestion.name ? { background: 'var(--app-primary)', borderColor: 'var(--app-primary)' } : { borderColor: 'var(--app-primary-border)', color: 'var(--app-primary-text)' }}
-                          >
-                            <span className="flex items-center justify-between">
-                              <span className="font-bold text-sm">{suggestion.name}</span>
-                              {stats.bestFitDist === suggestion.name && <CheckCircle2 size={14} />}
-                            </span>
-                            <span className="text-[10px]" style={{ color: stats.bestFitDist === suggestion.name ? 'color-mix(in srgb, white 82%, var(--app-primary-soft))' : 'var(--app-text-soft)' }}>
-                              p-value: {suggestion.pValue.toFixed(4)}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-3 text-[11px] italic" style={{ color: 'var(--app-primary)' }}>{t.distributionQuestion}</p>
-                    </div>
-                  )}
-
-                  {(!stats.isNormal || selectedDist) && (
-                    <>
-                      <p className="text-sm mb-4" style={{ color: 'var(--app-primary-text)' }}>
-                        {selectedDist ? `${t.selectedDistribution}: ${selectedDist}` : t.adjustedExplanation}
-                      </p>
-                      {distributionReason && (
-                        <div className="app-callout app-callout-primary flex items-start gap-2 mb-4">
-                          <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--app-primary)' }} />
-                          <p className="text-xs italic" style={{ color: 'var(--app-primary-text)' }}>{distributionReason}</p>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <AdjustedMetric label="Pp (Adjusted)" value={stats.nonNormalPp ?? stats.pp} />
-                        <AdjustedMetric label="Ppk (Adjusted)" value={stats.nonNormalPpk ?? stats.ppk} />
-                      </div>
-                    </>
-                  )}
-                </section>
+                                ? 'color-mix(in srgb, white 82%, var(--app-primary-soft))'
+                                : 'var(--app-text-soft)',
+                          }}
+                        >
+                          p-value: {suggestion.pValue.toFixed(4)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px] italic" style={{ color: 'var(--app-primary)' }}>
+                    {t.distributionQuestion}
+                  </p>
+                </div>
               )}
 
-              <section className="app-panel overflow-hidden">
-                <div className="p-6 border-b app-divider flex items-center gap-2">
-                  <Info style={{ color: 'var(--app-primary)' }} size={20} />
-                  <h2 className="text-lg app-title">{t.detailedStats}</h2>
+              {(!stats.isNormal || selectedDist) && (
+                <>
+                  <p className="text-sm mb-4" style={{ color: 'var(--app-primary-text)' }}>
+                    {selectedDist ? `${t.selectedDistribution}: ${selectedDist}` : t.adjustedExplanation}
+                  </p>
+                  {distributionReason && (
+                    <div className="app-callout app-callout-primary flex items-start gap-2 mb-4">
+                      <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--app-primary)' }} />
+                      <p className="text-xs italic" style={{ color: 'var(--app-primary-text)' }}>{distributionReason}</p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <AdjustedMetric label="Pp (Adjusted)" value={stats.nonNormalPp ?? stats.pp} />
+                    <AdjustedMetric label="Ppk (Adjusted)" value={stats.nonNormalPpk ?? stats.ppk} />
+                  </div>
+                </>
+                )}
+            </section>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <ControlChartCard
+                title={subgroupSize === 1 ? t.iTitle : t.xBarTitle}
+                color="indigo"
+                data={controlCharts?.xBar.points || []}
+                cl={controlCharts?.xBar.cl}
+                ucl={controlCharts?.xBar.ucl}
+                lcl={controlCharts?.xBar.lcl}
+                interpretation={controlCharts?.xBar.points.some((point) => point.isOutlier) ? t.outOfControl : t.inControl}
+                interpretationLabel={t.interpretation}
+              />
+              <ControlChartCard
+                title={subgroupSize === 1 ? t.mrTitle : t.rTitle}
+                color="emerald"
+                data={controlCharts?.rChart.points || []}
+                cl={controlCharts?.rChart.cl}
+                ucl={controlCharts?.rChart.ucl}
+                lcl={controlCharts?.rChart.lcl}
+                interpretation={controlCharts?.rChart.points.some((point) => point.isOutlier) ? t.outOfControl : t.inControl}
+                interpretationLabel={t.interpretation}
+              />
+
+              <section className="app-panel p-6 flex flex-col">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <h3 className="app-title flex items-center gap-2">
+                    <div className="w-2 h-6 rounded-full" style={{ background: 'var(--app-chart-tertiary)' }} />
+                    {t.probabilityPlot} ({stats.bestFitDist || 'Normal'})
+                  </h3>
+                  <div className="app-badge app-badge-primary">
+                    {t.adPValue}: {adTest.pValue.toFixed(4)}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                  <SummaryBlock title={t.processStats}>
-                    <SummaryRow label={t.mean} value={stats?.mean.toFixed(4) || '0.0000'} />
-                    {adTest.pValue > 0.05 && (
-                      <SummaryRow label={t.sigmaWithin} value={stats?.sigmaWithin.toFixed(4) || '0.0000'} />
-                    )}
-                    <SummaryRow label={t.sigmaOverall} value={stats?.sigmaOverall.toFixed(4) || '0.0000'} />
-                  </SummaryBlock>
-                  <SummaryBlock title={stats?.bestFitDist === 'Normal' ? t.normalityTest : t.goodnessOfFit}>
-                    <SummaryRow label={t.adStat} value={adTest.aSquared.toFixed(4)} />
-                    <SummaryRow label={t.pValue} value={adTest.pValue.toFixed(4)} />
-                    <SummaryRow
-                      label={t.status}
-                      value={adTest.pValue > 0.05 ? stats?.bestFitDist || 'Normal' : t.notNormal}
-                      valueClassName={adTest.pValue > 0.05 ? 'app-text-success' : 'app-text-danger'}
-                    />
-                    {adTest.pValue <= 0.05 && stats?.bestFitDist && (
-                      <SummaryRow label={t.bestFit} value={stats.bestFitDist} valueClassName="app-text-primary" />
-                    )}
-                  </SummaryBlock>
-                  <SummaryBlock title={t.specs}>
-                    <SummaryRow label="LSL" value={String(lsl)} />
-                    <SummaryRow label={lang === 'es' ? 'Nominal' : 'Nominal'} value={String(nominal)} />
-                    <SummaryRow label="USL" value={String(usl)} />
-                  </SummaryBlock>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                      <XAxis
+                        type="number"
+                        dataKey="val"
+                        name={t.observedValue}
+                        stroke="#94A3B8"
+                        fontSize={12}
+                        domain={['auto', 'auto']}
+                        label={{ value: chartLabelX, position: 'bottom', offset: 0, fontSize: 10, fontWeight: 'bold' }}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="z"
+                        name={t.probability}
+                        stroke="#94A3B8"
+                        fontSize={12}
+                        label={{ value: chartLabelY, angle: -90, position: 'left', fontSize: 10, fontWeight: 'bold' }}
+                      />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      <Scatter name={t.data} data={probPlotData} fill="#3B82F6" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
                 </div>
+                <ChartInterpretation label={t.interpretation}>
+                  {adTest.pValue > 0.05
+                    ? `${lang === 'es' ? 'Los datos parecen seguir una distribución' : 'The data appears to follow a'} ${stats.bestFitDist || 'Normal'}.`
+                    : `${lang === 'es' ? 'Los datos no parecen seguir una distribución' : 'The data does not appear to follow a'} ${stats.bestFitDist || 'Normal'}.`}
+                </ChartInterpretation>
               </section>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-    </div>
+
+              <section className="app-panel p-6 flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="app-title flex items-center gap-2">
+                    <div className="w-2 h-6 rounded-full" style={{ background: 'var(--app-chart-warning)' }} />
+                    {t.histogram} ({stats.bestFitDist || 'Normal'})
+                  </h3>
+                </div>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
+                    <ComposedChart data={histogramData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                      <XAxis dataKey="mid" stroke="#94A3B8" fontSize={10} tickFormatter={(value) => Number(value).toFixed(2)} />
+                      <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      {!Number.isNaN(lsl) && (
+                        <ReferenceLine x={lsl} stroke="#F43F5E" strokeWidth={2} label={{ position: 'top', value: 'LSL', fill: '#F43F5E', fontSize: 10, fontWeight: 'bold' }} />
+                      )}
+                      {!Number.isNaN(usl) && (
+                        <ReferenceLine x={usl} stroke="#F43F5E" strokeWidth={2} label={{ position: 'top', value: 'USL', fill: '#F43F5E', fontSize: 10, fontWeight: 'bold' }} />
+                      )}
+                      <Bar dataKey="count" fill="#FDE68A" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="curve" stroke="#D97706" strokeWidth={2} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <ChartInterpretation label={t.interpretation}>
+                  {stats.ppk >= 1.33 ? t.capable : t.notCapable} {isCentered ? t.centered : t.notCentered}{' '}
+                  {t.curveBasedOn}: {stats.bestFitDist || 'Normal'}
+                </ChartInterpretation>
+              </section>
+            </div>
+
+            <section className="app-panel overflow-hidden">
+              <div className="p-6 border-b app-divider flex items-center gap-2">
+                <Info style={{ color: 'var(--app-primary)' }} size={20} />
+                <h2 className="text-lg app-title">{t.detailedStats}</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                <SummaryBlock title={t.processStats}>
+                  <SummaryRow label={t.mean} value={stats.mean.toFixed(4)} />
+                  {adTest.pValue > 0.05 && (
+                    <SummaryRow label={t.sigmaWithin} value={stats.sigmaWithin.toFixed(4)} />
+                  )}
+                  <SummaryRow label={t.sigmaOverall} value={stats.sigmaOverall.toFixed(4)} />
+                </SummaryBlock>
+                <SummaryBlock title={stats.bestFitDist === 'Normal' ? t.normalityTest : t.goodnessOfFit}>
+                  <SummaryRow label={t.adStat} value={adTest.aSquared.toFixed(4)} />
+                  <SummaryRow label={t.pValue} value={adTest.pValue.toFixed(4)} />
+                  <SummaryRow
+                    label={t.status}
+                    value={adTest.pValue > 0.05 ? stats.bestFitDist || 'Normal' : t.notNormal}
+                    valueClassName={adTest.pValue > 0.05 ? 'app-text-success' : 'app-text-danger'}
+                  />
+                  {adTest.pValue <= 0.05 && stats.bestFitDist && (
+                    <SummaryRow label={t.bestFit} value={stats.bestFitDist} valueClassName="app-text-primary" />
+                  )}
+                </SummaryBlock>
+                <SummaryBlock title={t.specs}>
+                  <SummaryRow label="LSL" value={String(lsl)} />
+                  <SummaryRow label={lang === 'es' ? 'Nominal' : 'Nominal'} value={String(nominal)} />
+                  <SummaryRow label="USL" value={String(usl)} />
+                </SummaryBlock>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    </SidebarLayout>
   );
 }
 

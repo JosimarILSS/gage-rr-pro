@@ -6,6 +6,8 @@ type SidebarLayoutProps = {
   children: ReactNode;
   mainRef?: RefObject<HTMLDivElement | null>;
   mobileSidebarCollapsed?: boolean;
+  sidebarClassName?: string;
+  mainClassName?: string;
 };
 
 export default function SidebarLayout({
@@ -13,6 +15,8 @@ export default function SidebarLayout({
   children,
   mainRef,
   mobileSidebarCollapsed = false,
+  sidebarClassName = '',
+  mainClassName = '',
 }: SidebarLayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const showSidebarOnlyOnMobile = !mobileSidebarCollapsed;
@@ -44,7 +48,7 @@ export default function SidebarLayout({
 
       <div
         id="print-sidebar"
-        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass}`}
+        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass} ${sidebarClassName}`}
       >
         {!showSidebarOnlyOnMobile && (
           <button
@@ -52,7 +56,7 @@ export default function SidebarLayout({
             type="button"
             aria-label="Close sidebar"
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="md:hidden absolute top-3 right-3 app-button app-button-secondary app-button-round app-button-icon"
+            className="app-mobile-only absolute top-3 right-3 app-button app-button-secondary app-button-round app-button-icon"
           >
             <X className="w-6 h-6" />
           </button>
@@ -63,7 +67,7 @@ export default function SidebarLayout({
       <div
         id="print-main"
         ref={mainRef}
-        className={`flex-1 p-6 md:p-10 overflow-y-auto ${showSidebarOnlyOnMobile ? 'hidden md:block' : 'block'}`}
+        className={`flex-1 p-6 md:p-10 overflow-y-auto ${showSidebarOnlyOnMobile ? 'hidden md:block' : 'block'} ${mainClassName}`}
       >
         {children}
       </div>
@@ -74,7 +78,7 @@ export default function SidebarLayout({
           type="button"
           aria-label="Open sidebar"
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="md:hidden fixed bottom-5 right-5 z-20 app-button app-button-primary app-button-round w-14 h-14 shadow-lg"
+          className="app-mobile-only fixed bottom-5 right-5 z-20 app-button app-button-primary app-button-round w-14 h-14 shadow-lg"
         >
           <PanelLeft className="w-5 h-5" />
         </button>

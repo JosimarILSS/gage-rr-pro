@@ -79,7 +79,7 @@ export default function ToolsPage({
 }: ToolsPageProps) {
   const copy = {
     es: {
-      appName: 'Gage R&R Pro',
+      appName: 'International Lean Six Sigma Tools',
       toolsTitle: 'Herramientas',
       toolsSubtitle: 'Selecciona la herramienta con la que vas a trabajar.',
       toolStatus: 'Disponible',
@@ -112,7 +112,7 @@ export default function ToolsPage({
       benefits: [
         'Interpretación profesional del diagnóstico Gage R&R.',
         'Recomendaciones de acción según la fuente principal de error.',
-        'Acceso a resultados premium durante 6 meses desde el pago.',
+        'Acceso a resultados premium una vez realizado el pago.',
       ],
       unlock: 'Contratar premium por 150 MXN',
       loading: 'Abriendo checkout...',
@@ -122,7 +122,7 @@ export default function ToolsPage({
       language: 'EN',
     },
     en: {
-      appName: 'Gage R&R Pro',
+      appName: 'International Lean Six Sigma Tools',
       toolsTitle: 'Tools',
       toolsSubtitle: 'Choose the tool you want to work with.',
       toolStatus: 'Available',
@@ -355,7 +355,7 @@ export default function ToolsPage({
                   </div>
                 </div>
               )}
-              {accountProfile?.uid && (
+              {/* {accountProfile?.uid && (
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="w-4 h-4 app-icon-muted mt-0.5 shrink-0" />
                   <div className="min-w-0">
@@ -365,7 +365,7 @@ export default function ToolsPage({
                     </dd>
                   </div>
                 </div>
-              )}
+              )} */}
             </dl>
           </div>
 

@@ -185,6 +185,12 @@
   padding: 0;
 }
 
+@media (min-width: 768px) {
+  .app-mobile-only {
+    display: none !important;
+  }
+}
+
 .app-button-primary {
   background: var(--app-primary);
   color: white;
