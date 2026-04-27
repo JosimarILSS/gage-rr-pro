@@ -575,10 +575,10 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
             {importError && <p className="text-sm app-text-danger">{importError}</p>}
           </section>
 
-          <section className="min-h-0 space-y-3">
+          <section className="min-h-0 space-y-3 pb-[30px]">
             <div className="flex items-center justify-between gap-3">
               <h2 className="app-label flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4 app-text-primary pb-[15px]" />
+                <FileSpreadsheet className="h-4 w-4 app-text-primary" />
                 {t.config}
               </h2>
               <span className="app-badge">{subgroups.length}</span>
