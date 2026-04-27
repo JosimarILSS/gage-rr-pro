@@ -48,7 +48,7 @@ export default function SidebarLayout({
 
       <div
         id="print-sidebar"
-        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass} ${sidebarClassName}`}
+        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 !pb-[30px] ${mobileSidebarClass} ${sidebarClassName}`}
       >
         {!showSidebarOnlyOnMobile && (
           <button
