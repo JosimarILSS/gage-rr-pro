@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   TrendingUp,
   UserCircle,
+  Wrench,
 } from 'lucide-react';
 import type { UserAccountProfile } from '../services/auth';
 import type { Lang } from '../types/common';
@@ -79,7 +80,7 @@ export default function ToolsPage({
 }: ToolsPageProps) {
   const copy = {
     es: {
-      appName: 'International Lean Six Sigma Tools',
+      appName: 'ILSS Labs',
       toolsTitle: 'Herramientas',
       toolsSubtitle: 'Selecciona la herramienta con la que vas a trabajar.',
       toolStatus: 'Disponible',
@@ -122,7 +123,7 @@ export default function ToolsPage({
       language: 'EN',
     },
     en: {
-      appName: 'International Lean Six Sigma Tools',
+      appName: 'ILSS Labs',
       toolsTitle: 'Tools',
       toolsSubtitle: 'Choose the tool you want to work with.',
       toolStatus: 'Available',
@@ -191,7 +192,7 @@ export default function ToolsPage({
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="app-icon-tile shrink-0">
-              <BarChart3 className="w-5 h-5" />
+              <Wrench className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <p className="text-sm app-muted">{copy.appName}</p>

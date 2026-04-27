@@ -86,7 +86,7 @@ export const t = {
     box: "Caja (Q1-Q3)",
     measurement: "Medición",
     val: "Valor",
-    landingTitle: "International Lean Six Sigma Tools",
+    landingTitle: "ILSS Labs",
     landingDesc: "Plataforma avanzada para el Análisis de Sistemas de Medición. Evalúa la precisión, repetibilidad y reproducibilidad de tus procesos con calidad profesional.",
     loginGoogle: "Iniciar sesión con Google",
     logout: "Cerrar sesión"
@@ -178,7 +178,7 @@ export const t = {
     box: "Box (Q1-Q3)",
     measurement: "Measurement",
     val: "Value",
-    landingTitle: "International Lean Six Sigma Tools",
+    landingTitle: "ILSS Labs",
     landingDesc: "Advanced platform for Measurement System Analysis. Evaluate the precision, repeatability, and reproducibility of your processes with professional quality.",
     loginGoogle: "Sign in with Google",
     logout: "Sign out"
