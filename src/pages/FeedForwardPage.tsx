@@ -105,7 +105,22 @@ const getErrorMessage = (error: unknown) => (error instanceof Error ? error.mess
 type PdfMarkdownBlock =
   | { kind: 'heading'; level: number; text: string }
   | { kind: 'paragraph'; text: string }
-  | { kind: 'list'; ordered: boolean; items: string[] };
+  | { kind: 'list'; ordered: boolean; items: PdfListItem[] };
+
+type PdfListItem = {
+  text: string;
+  marker?: number;
+  indent: number;
+};
+
+type PdfTextRun = {
+  text: string;
+  bold: boolean;
+};
+
+type PdfTextLine = {
+  runs: PdfTextRun[];
+};
 
 type PdfRenderState = {
   pdf: jsPDF;
@@ -118,31 +133,67 @@ type PdfRenderState = {
   y: number;
 };
 
-const stripMarkdown = (value: string) =>
+const cleanMarkdownLinks = (value: string) =>
   value
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
     .replace(/`([^`]+)`/g, '$1')
-    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ');
+
+const parseInlineMarkdown = (value: string): PdfTextRun[] => {
+  const source = cleanMarkdownLinks(value);
+  const runs: PdfTextRun[] = [];
+  const boldRegex = /(\*\*|__)(.*?)\1/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boldRegex.exec(source))) {
+    if (match.index > cursor) {
+      runs.push({ text: source.slice(cursor, match.index), bold: false });
+    }
+    runs.push({ text: match[2], bold: true });
+    cursor = match.index + match[0].length;
+  }
+
+  if (cursor < source.length) {
+    runs.push({ text: source.slice(cursor), bold: false });
+  }
+
+  return runs
+    .map((run) => ({
+      ...run,
+      text: run.text.replace(/(\*|_)(.*?)\1/g, '$2'),
+    }))
+    .filter((run) => run.text.length > 0);
+};
+
+const stripMarkdown = (value: string) =>
+  parseInlineMarkdown(value)
+    .map((run) => run.text)
+    .join('')
     .trim();
 
 const parseMarkdownBlocks = (markdown: string): PdfMarkdownBlock[] => {
   const blocks: PdfMarkdownBlock[] = [];
   const paragraphLines: string[] = [];
-  let listItems: string[] = [];
+  let listItems: PdfListItem[] = [];
   let listOrdered = false;
 
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
-    blocks.push({ kind: 'paragraph', text: stripMarkdown(paragraphLines.join(' ')) });
+    blocks.push({ kind: 'paragraph', text: paragraphLines.join(' ') });
     paragraphLines.length = 0;
   };
 
   const flushList = () => {
     if (!listItems.length) return;
-    blocks.push({ kind: 'list', ordered: listOrdered, items: listItems.map(stripMarkdown).filter(Boolean) });
+    blocks.push({
+      kind: 'list',
+      ordered: listOrdered,
+      items: listItems
+        .map((item) => ({ ...item, text: item.text.trim() }))
+        .filter((item) => stripMarkdown(item.text)),
+    });
     listItems = [];
   };
 
@@ -167,21 +218,28 @@ const parseMarkdownBlocks = (markdown: string): PdfMarkdownBlock[] => {
       return;
     }
 
-    const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
+    const bulletMatch = rawLine.match(/^(\s*)[-*+]\s+(.+)$/);
     if (bulletMatch) {
       flushParagraph();
       if (listItems.length && listOrdered) flushList();
       listOrdered = false;
-      listItems.push(bulletMatch[1]);
+      listItems.push({
+        indent: Math.min(Math.floor(bulletMatch[1].replace(/\t/g, '    ').length / 2), 3),
+        text: bulletMatch[2],
+      });
       return;
     }
 
-    const orderedMatch = line.match(/^\d+[.)]\s+(.+)$/);
+    const orderedMatch = rawLine.match(/^(\s*)(\d+)[.)]\s+(.+)$/);
     if (orderedMatch) {
       flushParagraph();
       if (listItems.length && !listOrdered) flushList();
       listOrdered = true;
-      listItems.push(orderedMatch[1]);
+      listItems.push({
+        indent: Math.min(Math.floor(orderedMatch[1].replace(/\t/g, '    ').length / 2), 3),
+        marker: Number(orderedMatch[2]),
+        text: orderedMatch[3],
+      });
       return;
     }
 
@@ -225,6 +283,80 @@ const ensurePdfSpace = (state: PdfRenderState, requiredHeight: number) => {
 const splitPdfText = (state: PdfRenderState, value: string, width: number) =>
   state.pdf.splitTextToSize(stripMarkdown(value), width) as string[];
 
+const measurePdfText = (state: PdfRenderState, text: string, fontSize: number, bold: boolean) => {
+  state.pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+  state.pdf.setFontSize(fontSize);
+  return state.pdf.getTextWidth(text);
+};
+
+const layoutPdfRichLines = (
+  state: PdfRenderState,
+  text: string,
+  width: number,
+  fontSize: number,
+  forceBold = false
+): PdfTextLine[] => {
+  const lines: PdfTextLine[] = [];
+  let currentLine: PdfTextRun[] = [];
+  let currentWidth = 0;
+
+  const pushLine = () => {
+    const trimmedRuns = currentLine
+      .map((run) => ({ ...run, text: run.text.replace(/\s+$/g, '') }))
+      .filter((run) => run.text.length > 0);
+    if (trimmedRuns.length) lines.push({ runs: trimmedRuns });
+    currentLine = [];
+    currentWidth = 0;
+  };
+
+  parseInlineMarkdown(text).forEach((run) => {
+    const bold = forceBold || run.bold;
+    const tokens = run.text.split(/(\s+)/).filter(Boolean);
+
+    tokens.forEach((token) => {
+      const isWhitespace = /^\s+$/.test(token);
+      if (isWhitespace && currentLine.length === 0) return;
+
+      const tokenText = isWhitespace ? ' ' : token;
+      const tokenWidth = measurePdfText(state, tokenText, fontSize, bold);
+
+      if (!isWhitespace && currentLine.length > 0 && currentWidth + tokenWidth > width) {
+        pushLine();
+      }
+
+      currentLine.push({ text: tokenText, bold });
+      currentWidth += tokenWidth;
+    });
+  });
+
+  pushLine();
+  return lines;
+};
+
+const drawPdfRichLine = (
+  state: PdfRenderState,
+  line: PdfTextLine,
+  x: number,
+  y: number,
+  options: {
+    fontSize: number;
+    normalColor: [number, number, number];
+    boldColor: [number, number, number];
+  }
+) => {
+  let cursorX = x;
+
+  line.runs.forEach((run) => {
+    state.pdf.setFont('helvetica', run.bold ? 'bold' : 'normal');
+    state.pdf.setFontSize(options.fontSize);
+    state.pdf.setTextColor(...(run.bold ? options.boldColor : options.normalColor));
+    if (run.text.trim()) {
+      state.pdf.text(run.text, cursorX, y);
+    }
+    cursorX += measurePdfText(state, run.text, options.fontSize, run.bold);
+  });
+};
+
 const drawPdfWrappedText = (
   state: PdfRenderState,
   text: string,
@@ -244,13 +376,10 @@ const drawPdfWrappedText = (
   const x = options.x ?? state.marginX;
   const width = options.width ?? state.contentWidth;
   const after = options.after ?? 0;
-  const lines = splitPdfText(state, cleanText, width);
+  const forceBold = options.fontStyle === 'bold';
+  const lines = layoutPdfRichLines(state, text, width, options.fontSize, forceBold);
   const blockHeight = lines.length * options.lineHeight + after;
   const pageBodyHeight = state.bottomY - state.marginY;
-
-  state.pdf.setFont('helvetica', options.fontStyle || 'normal');
-  state.pdf.setFontSize(options.fontSize);
-  state.pdf.setTextColor(...(options.color || [51, 65, 85]));
 
   if (blockHeight <= pageBodyHeight) {
     ensurePdfSpace(state, blockHeight);
@@ -260,7 +389,11 @@ const drawPdfWrappedText = (
 
   lines.forEach((line) => {
     ensurePdfSpace(state, options.lineHeight);
-    state.pdf.text(line, x, state.y);
+    drawPdfRichLine(state, line, x, state.y, {
+      fontSize: options.fontSize,
+      normalColor: options.color || [51, 65, 85],
+      boldColor: [15, 23, 42],
+    });
     state.y += options.lineHeight;
   });
 
@@ -312,10 +445,7 @@ const drawPdfLabelValue = (state: PdfRenderState, label: string, value: string) 
   state.y += 5;
 };
 
-const drawPdfList = (state: PdfRenderState, items: string[], ordered: boolean) => {
-  const markerWidth = 8;
-  const textX = state.marginX + markerWidth;
-  const textWidth = state.contentWidth - markerWidth;
+const drawPdfList = (state: PdfRenderState, items: PdfListItem[], ordered: boolean) => {
   const lineHeight = 5.8;
   const pageBodyHeight = state.bottomY - state.marginY;
 
@@ -324,7 +454,12 @@ const drawPdfList = (state: PdfRenderState, items: string[], ordered: boolean) =
   state.pdf.setTextColor(51, 65, 85);
 
   items.forEach((item, index) => {
-    const lines = splitPdfText(state, item, textWidth);
+    const indent = item.indent * 8;
+    const markerX = state.marginX + indent;
+    const markerWidth = ordered ? 8 : 6;
+    const textX = markerX + markerWidth;
+    const textWidth = state.pageWidth - state.marginX - textX;
+    const lines = layoutPdfRichLines(state, item.text, textWidth, 11.5);
     const itemHeight = lines.length * lineHeight + 2;
 
     ensurePdfSpace(state, itemHeight <= pageBodyHeight ? itemHeight : lineHeight);
@@ -332,9 +467,16 @@ const drawPdfList = (state: PdfRenderState, items: string[], ordered: boolean) =
     lines.forEach((line, lineIndex) => {
       ensurePdfSpace(state, lineHeight);
       if (lineIndex === 0) {
-        state.pdf.text(ordered ? `${index + 1}.` : '-', state.marginX, state.y);
+        state.pdf.setFont('helvetica', 'normal');
+        state.pdf.setFontSize(11.5);
+        state.pdf.setTextColor(100, 116, 139);
+        state.pdf.text(ordered ? `${item.marker ?? index + 1}.` : '•', markerX, state.y);
       }
-      state.pdf.text(line, textX, state.y);
+      drawPdfRichLine(state, line, textX, state.y, {
+        fontSize: 11.5,
+        normalColor: [51, 65, 85],
+        boldColor: [15, 23, 42],
+      });
       state.y += lineHeight;
     });
 
