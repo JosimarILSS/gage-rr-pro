@@ -414,8 +414,8 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
   return (
     <SidebarLayout
       mobileSidebarCollapsed={subgroups.length > 0}
-      sidebarClassName="md:!w-[420px] md:!max-w-[420px]"
-      mainClassName="md:p-6 xl:p-8"
+      sidebarClassName="md:!w-[340px] md:!max-w-[340px] lg:!w-[360px] lg:!max-w-[360px] xl:!w-[380px] xl:!max-w-[380px]"
+      mainClassName="pb-32 md:p-6 md:pb-6 xl:p-8 xl:pb-8"
       sidebar={
         <>
           <div>
@@ -511,7 +511,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
               </div>
             </div>
 
-            <div className="app-tabs app-tabs-stretch">
+            <div className="app-tabs app-tabs-stretch !grid grid-cols-2">
               {([
                 { id: 'manual', label: t.manualTab, icon: TableIcon },
                 { id: 'file', label: t.fileTab, icon: Upload },
@@ -521,11 +521,13 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                   key={id}
                   type="button"
                   onClick={() => setActiveDataTab(id)}
-                  className={`app-tab min-w-0 !px-2 !text-xs ${activeDataTab === id ? 'app-tab-active' : ''}`}
+                  className={`app-tab min-w-0 justify-center !px-2 !text-xs ${
+                    id === 'auto' ? 'col-span-2' : ''
+                  } ${activeDataTab === id ? 'app-tab-active' : ''}`}
                   aria-pressed={activeDataTab === id}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">{label}</span>
+                  <span className="whitespace-normal text-center leading-tight">{label}</span>
                 </button>
               ))}
             </div>
