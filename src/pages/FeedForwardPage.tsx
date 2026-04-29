@@ -415,89 +415,84 @@ export default function FeedForwardPage({
             className="app-input px-3 py-2.5 text-sm resize-none"
           />
         </div>
-      </div>
-    </>
-  );
 
-  return (
-    <SidebarLayout sidebar={sidebar} sidebarClassName="md:w-96" mainClassName="bg-slate-50">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <section className="app-panel p-5 md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-sm app-muted">{copy.methodology}</p>
-              <h2 className="text-xl app-title mt-1">{copy.details}</h2>
-            </div>
-            <div className="w-full lg:w-[360px]">
-              <select
-                id="methodology"
-                value={methodology}
-                onChange={(event) => setMethodology(event.target.value as MethodologyId)}
-                className="app-input px-3 py-2.5 text-sm"
-              >
-                {METHODOLOGIES.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="border-t app-divider pt-5 space-y-5">
+          <div>
+            <label htmlFor="methodology" className="app-label">
+              {copy.methodology}
+            </label>
+            <select
+              id="methodology"
+              value={methodology}
+              onChange={(event) => setMethodology(event.target.value as MethodologyId)}
+              className="app-input px-3 py-2.5 text-sm"
+            >
+              {METHODOLOGIES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentFields.map((field) => (
-              <div
-                key={field.id}
-                className={
-                  currentFields.length % 2 !== 0 && field.id === currentFields[currentFields.length - 1].id
-                    ? 'md:col-span-2'
-                    : ''
-                }
-              >
-                <label htmlFor={field.id} className="app-label">
-                  {field.label}
-                </label>
-                <textarea
-                  id={field.id}
-                  rows={4}
-                  value={textInputs[field.id] || ''}
-                  onChange={(event) => setTextInputs((current) => ({ ...current, [field.id]: event.target.value }))}
-                  placeholder={field.placeholder}
-                  className="app-input px-3 py-2.5 text-sm resize-none"
-                />
-              </div>
-            ))}
+          <div>
+            <h3 className="text-sm app-title">{copy.details}</h3>
+            <div className="mt-4 space-y-4">
+              {currentFields.map((field) => (
+                <div key={field.id}>
+                  <label htmlFor={field.id} className="app-label">
+                    {field.label}
+                  </label>
+                  <textarea
+                    id={field.id}
+                    rows={3}
+                    value={textInputs[field.id] || ''}
+                    onChange={(event) => setTextInputs((current) => ({ ...current, [field.id]: event.target.value }))}
+                    placeholder={field.placeholder}
+                    className="app-input px-3 py-2.5 text-sm resize-none"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {error && (
-            <div className="mt-5 app-alert app-alert-danger flex items-start gap-3 text-sm">
+            <div className="app-alert app-alert-danger flex items-start gap-3 text-sm">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <p>{error}</p>
             </div>
           )}
 
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={generateFeedback}
-              disabled={!canGenerate}
-              className="app-button app-button-primary w-full sm:w-auto px-5 py-3 text-sm"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {copy.generating}
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  {copy.generate}
-                </>
-              )}
-            </button>
-          </div>
-        </section>
+          <button
+            type="button"
+            onClick={generateFeedback}
+            disabled={!canGenerate}
+            className="app-button app-button-primary w-full px-5 py-3 text-sm"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {copy.generating}
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                {copy.generate}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
+  return (
+    <SidebarLayout
+      sidebar={sidebar}
+      sidebarClassName="md:w-[460px] lg:w-[520px]"
+      mainClassName="bg-slate-50"
+    >
+      <div className="max-w-5xl mx-auto">
         <AnimatePresence mode="popLayout">
           {feedback ? (
             <motion.section
