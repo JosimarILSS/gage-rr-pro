@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -10,7 +10,6 @@ import {
   Send,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import SidebarLayout from '../layouts/SidebarLayout';
@@ -103,6 +102,289 @@ const groupedPersonalities = PERSONALITIES.reduce<Record<string, typeof PERSONAL
 
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : '');
 
+type PdfMarkdownBlock =
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'list'; ordered: boolean; items: string[] };
+
+type PdfRenderState = {
+  pdf: jsPDF;
+  marginX: number;
+  marginY: number;
+  pageWidth: number;
+  pageHeight: number;
+  contentWidth: number;
+  bottomY: number;
+  y: number;
+};
+
+const stripMarkdown = (value: string) =>
+  value
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .trim();
+
+const parseMarkdownBlocks = (markdown: string): PdfMarkdownBlock[] => {
+  const blocks: PdfMarkdownBlock[] = [];
+  const paragraphLines: string[] = [];
+  let listItems: string[] = [];
+  let listOrdered = false;
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    blocks.push({ kind: 'paragraph', text: stripMarkdown(paragraphLines.join(' ')) });
+    paragraphLines.length = 0;
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push({ kind: 'list', ordered: listOrdered, items: listItems.map(stripMarkdown).filter(Boolean) });
+    listItems = [];
+  };
+
+  markdown.split(/\r?\n/).forEach((rawLine) => {
+    const line = rawLine.trim();
+
+    if (!line || /^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        kind: 'heading',
+        level: headingMatch[1].length,
+        text: stripMarkdown(headingMatch[2]),
+      });
+      return;
+    }
+
+    const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
+    if (bulletMatch) {
+      flushParagraph();
+      if (listItems.length && listOrdered) flushList();
+      listOrdered = false;
+      listItems.push(bulletMatch[1]);
+      return;
+    }
+
+    const orderedMatch = line.match(/^\d+[.)]\s+(.+)$/);
+    if (orderedMatch) {
+      flushParagraph();
+      if (listItems.length && !listOrdered) flushList();
+      listOrdered = true;
+      listItems.push(orderedMatch[1]);
+      return;
+    }
+
+    flushList();
+    paragraphLines.push(line);
+  });
+
+  flushParagraph();
+  flushList();
+  return blocks.filter((block) => block.kind !== 'paragraph' || block.text);
+};
+
+const createPdfRenderState = (pdf: jsPDF): PdfRenderState => {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const marginX = 18;
+  const marginY = 18;
+
+  return {
+    pdf,
+    marginX,
+    marginY,
+    pageWidth,
+    pageHeight,
+    contentWidth: pageWidth - marginX * 2,
+    bottomY: pageHeight - marginY,
+    y: marginY,
+  };
+};
+
+const addPdfPage = (state: PdfRenderState) => {
+  state.pdf.addPage();
+  state.y = state.marginY;
+};
+
+const ensurePdfSpace = (state: PdfRenderState, requiredHeight: number) => {
+  if (state.y + requiredHeight <= state.bottomY) return;
+  addPdfPage(state);
+};
+
+const splitPdfText = (state: PdfRenderState, value: string, width: number) =>
+  state.pdf.splitTextToSize(stripMarkdown(value), width) as string[];
+
+const drawPdfWrappedText = (
+  state: PdfRenderState,
+  text: string,
+  options: {
+    fontSize: number;
+    fontStyle?: 'normal' | 'bold';
+    lineHeight: number;
+    color?: [number, number, number];
+    x?: number;
+    width?: number;
+    after?: number;
+  }
+) => {
+  const cleanText = stripMarkdown(text);
+  if (!cleanText) return;
+
+  const x = options.x ?? state.marginX;
+  const width = options.width ?? state.contentWidth;
+  const after = options.after ?? 0;
+  const lines = splitPdfText(state, cleanText, width);
+  const blockHeight = lines.length * options.lineHeight + after;
+  const pageBodyHeight = state.bottomY - state.marginY;
+
+  state.pdf.setFont('helvetica', options.fontStyle || 'normal');
+  state.pdf.setFontSize(options.fontSize);
+  state.pdf.setTextColor(...(options.color || [51, 65, 85]));
+
+  if (blockHeight <= pageBodyHeight) {
+    ensurePdfSpace(state, blockHeight);
+  } else {
+    ensurePdfSpace(state, options.lineHeight);
+  }
+
+  lines.forEach((line) => {
+    ensurePdfSpace(state, options.lineHeight);
+    state.pdf.text(line, x, state.y);
+    state.y += options.lineHeight;
+  });
+
+  state.y += after;
+};
+
+const drawPdfHeading = (state: PdfRenderState, text: string, level = 1) => {
+  const fontSize = level === 1 ? 18 : level === 2 ? 14 : 12;
+  const lineHeight = level === 1 ? 8 : 6.5;
+  const before = level === 1 ? 4 : 2;
+  const after = level === 1 ? 6 : 4;
+
+  if (state.y > state.marginY + 2) state.y += before;
+  ensurePdfSpace(state, level === 1 ? 26 : 20);
+
+  drawPdfWrappedText(state, text, {
+    fontSize,
+    fontStyle: 'bold',
+    lineHeight,
+    color: [15, 23, 42],
+    after,
+  });
+};
+
+const drawPdfLabelValue = (state: PdfRenderState, label: string, value: string) => {
+  const cleanValue = value.trim() || 'No especificado';
+  const valueLines = splitPdfText(state, cleanValue, state.contentWidth);
+  const blockHeight = 4 + valueLines.length * 5.2 + 5;
+  const pageBodyHeight = state.bottomY - state.marginY;
+
+  ensurePdfSpace(state, blockHeight <= pageBodyHeight ? blockHeight : 12);
+
+  state.pdf.setFont('helvetica', 'bold');
+  state.pdf.setFontSize(8);
+  state.pdf.setTextColor(100, 116, 139);
+  state.pdf.text(label.toUpperCase(), state.marginX, state.y);
+  state.y += 5;
+
+  state.pdf.setFont('helvetica', 'normal');
+  state.pdf.setFontSize(10.5);
+  state.pdf.setTextColor(15, 23, 42);
+
+  valueLines.forEach((line) => {
+    ensurePdfSpace(state, 5.2);
+    state.pdf.text(line, state.marginX, state.y);
+    state.y += 5.2;
+  });
+
+  state.y += 5;
+};
+
+const drawPdfList = (state: PdfRenderState, items: string[], ordered: boolean) => {
+  const markerWidth = 8;
+  const textX = state.marginX + markerWidth;
+  const textWidth = state.contentWidth - markerWidth;
+  const lineHeight = 5.8;
+  const pageBodyHeight = state.bottomY - state.marginY;
+
+  state.pdf.setFont('helvetica', 'normal');
+  state.pdf.setFontSize(11.5);
+  state.pdf.setTextColor(51, 65, 85);
+
+  items.forEach((item, index) => {
+    const lines = splitPdfText(state, item, textWidth);
+    const itemHeight = lines.length * lineHeight + 2;
+
+    ensurePdfSpace(state, itemHeight <= pageBodyHeight ? itemHeight : lineHeight);
+
+    lines.forEach((line, lineIndex) => {
+      ensurePdfSpace(state, lineHeight);
+      if (lineIndex === 0) {
+        state.pdf.text(ordered ? `${index + 1}.` : '-', state.marginX, state.y);
+      }
+      state.pdf.text(line, textX, state.y);
+      state.y += lineHeight;
+    });
+
+    state.y += 2;
+  });
+
+  state.y += 2;
+};
+
+const renderPdfMarkdown = (state: PdfRenderState, markdown: string) => {
+  parseMarkdownBlocks(markdown).forEach((block) => {
+    if (block.kind === 'heading') {
+      drawPdfHeading(state, block.text, block.level);
+      return;
+    }
+
+    if (block.kind === 'list') {
+      drawPdfList(state, block.items, block.ordered);
+      return;
+    }
+
+    drawPdfWrappedText(state, block.text, {
+      fontSize: 11.5,
+      lineHeight: 6,
+      color: [51, 65, 85],
+      after: 4,
+    });
+  });
+};
+
+const drawPdfDivider = (state: PdfRenderState) => {
+  ensurePdfSpace(state, 12);
+  state.pdf.setDrawColor(226, 232, 240);
+  state.pdf.line(state.marginX, state.y, state.pageWidth - state.marginX, state.y);
+  state.y += 10;
+};
+
+const addPdfPageNumbers = (state: PdfRenderState) => {
+  const pageCount = state.pdf.getNumberOfPages();
+  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+    state.pdf.setPage(pageNumber);
+    state.pdf.setFont('helvetica', 'normal');
+    state.pdf.setFontSize(8);
+    state.pdf.setTextColor(100, 116, 139);
+    state.pdf.text(`${pageNumber}/${pageCount}`, state.pageWidth - state.marginX, state.pageHeight - 8, {
+      align: 'right',
+    });
+  }
+};
+
 export default function FeedForwardPage({
   lang,
   onToggleLang,
@@ -120,7 +402,6 @@ export default function FeedForwardPage({
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const feedbackRef = useRef<HTMLDivElement>(null);
 
   const apiBaseUrl = useMemo(
     () => (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '') || (import.meta.env.DEV ? 'http://localhost:4242' : ''),
@@ -241,147 +522,36 @@ export default function FeedForwardPage({
     }
   };
 
-  const applyPdfStyles = (captureNode: HTMLElement) => {
-    captureNode.style.position = 'absolute';
-    captureNode.style.left = '-9999px';
-    captureNode.style.top = '0';
-    captureNode.style.width = '800px';
-    captureNode.style.backgroundColor = '#ffffff';
-    captureNode.style.padding = '40px';
-    captureNode.className = '';
-
-    const allElements = captureNode.querySelectorAll('*');
-    allElements.forEach((node) => {
-      if (!(node instanceof HTMLElement)) return;
-
-      const tag = node.tagName.toLowerCase();
-      node.className = '';
-      if (tag === 'h1') {
-        node.style.cssText =
-          'font-size: 24px; font-weight: bold; margin: 0 0 20px; color: #0f172a; font-family: sans-serif;';
-      } else if (tag === 'h2') {
-        node.style.cssText =
-          'font-size: 20px; font-weight: bold; margin: 24px 0 12px; color: #0f172a; font-family: sans-serif;';
-      } else if (tag === 'h3') {
-        node.style.cssText =
-          'font-size: 18px; font-weight: bold; margin: 20px 0 10px; color: #0f172a; font-family: sans-serif;';
-      } else if (tag === 'p') {
-        node.style.cssText =
-          'font-size: 14px; line-height: 1.6; margin: 0 0 12px; color: #334155; font-family: sans-serif;';
-      } else if (tag === 'strong' || tag === 'b') {
-        node.style.cssText = 'font-weight: normal; color: #0f172a;';
-      } else if (tag === 'ul' || tag === 'ol') {
-        node.style.cssText = 'margin: 0 0 12px; padding-left: 24px; font-family: sans-serif;';
-      } else if (tag === 'li') {
-        node.style.cssText =
-          'font-size: 14px; line-height: 1.5; margin-bottom: 6px; color: #334155; font-family: sans-serif;';
-      } else if (tag === 'hr') {
-        node.style.display = 'none';
-      }
-    });
-  };
-
-  const createSummaryField = (label: string, value: string) => {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'margin-bottom: 16px;';
-
-    const title = document.createElement('div');
-    title.textContent = label;
-    title.style.cssText =
-      'font-size: 11px; line-height: 1.4; margin: 0 0 4px; color: #64748b; font-weight: bold; text-transform: uppercase; font-family: sans-serif;';
-
-    const body = document.createElement('div');
-    body.textContent = value.trim() || 'No especificado';
-    body.style.cssText =
-      'font-size: 14px; line-height: 1.6; margin: 0; color: #0f172a; white-space: pre-wrap; font-family: sans-serif;';
-
-    wrapper.appendChild(title);
-    wrapper.appendChild(body);
-    return wrapper;
-  };
-
-  const createFullPdfNode = () => {
-    if (!feedbackRef.current) return null;
-
-    const container = document.createElement('div');
-    const inputSection = document.createElement('section');
-    inputSection.style.cssText = 'margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0;';
-
-    const title = document.createElement('h1');
-    title.textContent = copy.config;
-    inputSection.appendChild(title);
-
-    inputSection.appendChild(createSummaryField(copy.personName, personName));
-    inputSection.appendChild(createSummaryField(copy.generation, selectedGeneration));
-    inputSection.appendChild(createSummaryField(copy.personality, selectedPersonality));
-    inputSection.appendChild(createSummaryField(`${copy.directives} (${copy.directivesOptional})`, companyDirectives));
-    inputSection.appendChild(createSummaryField(copy.methodology, selectedMethodology));
-
-    const detailsTitle = document.createElement('h2');
-    detailsTitle.textContent = copy.details;
-    inputSection.appendChild(detailsTitle);
-
-    currentFields.forEach((field) => {
-      inputSection.appendChild(createSummaryField(field.label, textInputs[field.id] || ''));
-    });
-
-    const resultTitle = document.createElement('h1');
-    resultTitle.textContent = copy.result;
-
-    const feedbackNode = feedbackRef.current.cloneNode(true) as HTMLElement;
-    container.appendChild(inputSection);
-    container.appendChild(resultTitle);
-    container.appendChild(feedbackNode);
-    return container;
-  };
-
   const downloadPDF = async (includeInputData = false) => {
-    if (!feedbackRef.current) return;
-
-    let captureNode: HTMLElement | null = null;
+    if (!feedback) return;
 
     try {
       setIsDownloadingPdf(true);
       setIsPdfModalOpen(false);
-      captureNode = includeInputData ? createFullPdfNode() : (feedbackRef.current.cloneNode(true) as HTMLElement);
-      if (!captureNode) return;
-
-      applyPdfStyles(captureNode);
-
-      document.body.appendChild(captureNode);
-
-      const canvas = await html2canvas(captureNode, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-      });
-
-      document.body.removeChild(captureNode);
-      captureNode = null;
-
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
       });
+      const pdfState = createPdfRenderState(pdf);
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
+      if (includeInputData) {
+        drawPdfHeading(pdfState, copy.config, 1);
+        drawPdfLabelValue(pdfState, copy.personName, personName);
+        drawPdfLabelValue(pdfState, copy.generation, selectedGeneration);
+        drawPdfLabelValue(pdfState, copy.personality, selectedPersonality);
+        drawPdfLabelValue(pdfState, `${copy.directives} (${copy.directivesOptional})`, companyDirectives);
+        drawPdfLabelValue(pdfState, copy.methodology, selectedMethodology);
+        drawPdfHeading(pdfState, copy.details, 2);
+        currentFields.forEach((field) => {
+          drawPdfLabelValue(pdfState, field.label, textInputs[field.id] || '');
+        });
+        drawPdfDivider(pdfState);
+        drawPdfHeading(pdfState, copy.result, 1);
       }
+
+      renderPdfMarkdown(pdfState, feedback);
+      addPdfPageNumbers(pdfState);
 
       const fileSuffix = includeInputData ? 'Completo' : 'Resultado';
       pdf.save(`FeedFoward_${fileSuffix}_${personName.trim().replace(/\s+/g, '_') || 'Plan'}.pdf`);
@@ -390,9 +560,6 @@ export default function FeedForwardPage({
       setError(message ? `${copy.pdfError} ${message}` : copy.pdfError);
     } finally {
       setIsDownloadingPdf(false);
-      if (captureNode?.parentNode) {
-        captureNode.parentNode.removeChild(captureNode);
-      }
     }
   };
 
@@ -612,7 +779,7 @@ export default function FeedForwardPage({
                 </button>
               </div>
 
-              <div ref={feedbackRef} className="bg-white p-6 md:p-10">
+              <div className="bg-white p-6 md:p-10">
                 <ReactMarkdown
                   components={{
                     h1: ({ children }) => <h1 className="text-2xl app-title mt-8 first:mt-0 mb-4">{children}</h1>,
