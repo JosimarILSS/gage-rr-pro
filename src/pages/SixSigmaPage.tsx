@@ -15,7 +15,6 @@ import {
   TrendingUp,
   Upload,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import {
   Bar,
   CartesianGrid,
@@ -48,6 +47,12 @@ type SixSigmaPageProps = {
   onBackToTools: () => void;
 };
 
+type DataEntryTab = 'manual' | 'file' | 'auto';
+
+const AUTO_FILL_COLUMN_COUNT = 5;
+const DEFAULT_AUTO_FILL_ROWS = 15;
+const MAX_AUTO_FILL_ROWS = 500;
+
 const createInitialSubgroups = (): SubgroupData[] =>
   Array.from({ length: 10 }, (_, index) => ({
     id: index + 1,
@@ -67,13 +72,17 @@ const translations = {
     usl: 'Límite Superior (USL)',
     subgroupSize: 'Tamaño de Subgrupo (n)',
     dataEntry: 'Entrada de Datos',
-    bulkImport: 'Carga masiva',
+    manualTab: 'Manual',
+    fileTab: 'Excel/CSV',
+    autoTab: 'Automático',
     clear: 'Limpiar',
-    add: 'Agregar',
-    sample: 'Ejemplo',
-    bulkLabel: 'Pega tus datos aquí separados por tabulador, coma o espacio.',
-    cancel: 'Cancelar',
-    import: 'Importar datos',
+    addNewRow: 'Agregar nueva fila',
+    emptyDataText: 'Agrega o importa datos para analizar.',
+    fileImportTitle: 'Carga mediante Excel/CSV',
+    fileImportCta: 'Seleccionar Excel/CSV',
+    autoFillTitle: 'Llenado rápido automático',
+    autoRowsLabel: 'Filas de 5 columnas',
+    generate: 'Generar',
     id: 'ID',
     samplePrefix: 'Muestra',
     cp: 'Capacidad potencial',
@@ -143,13 +152,17 @@ const translations = {
     usl: 'Upper Spec Limit (USL)',
     subgroupSize: 'Subgroup Size (n)',
     dataEntry: 'Data Entry',
-    bulkImport: 'Bulk import',
+    manualTab: 'Manual',
+    fileTab: 'Excel/CSV',
+    autoTab: 'Auto',
     clear: 'Clear',
-    add: 'Add',
-    sample: 'Sample',
-    bulkLabel: 'Paste data here, separated by tab, comma, or space.',
-    cancel: 'Cancel',
-    import: 'Import data',
+    addNewRow: 'Add new row',
+    emptyDataText: 'Add or import data to analyze.',
+    fileImportTitle: 'Load with Excel/CSV',
+    fileImportCta: 'Select Excel/CSV',
+    autoFillTitle: 'Automatic quick fill',
+    autoRowsLabel: 'Rows with 5 columns',
+    generate: 'Generate',
     id: 'ID',
     samplePrefix: 'Sample',
     cp: 'Potential capability',
@@ -264,8 +277,8 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
   const [subgroupSize, setSubgroupSize] = useState<number>(5);
   const [subgroups, setSubgroups] = useState<SubgroupData[]>(createInitialSubgroups);
   const [selectedDist, setSelectedDist] = useState<string | undefined>(undefined);
-  const [bulkData, setBulkData] = useState('');
-  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [activeDataTab, setActiveDataTab] = useState<DataEntryTab>('manual');
+  const [autoFillRows, setAutoFillRows] = useState<number>(DEFAULT_AUTO_FILL_ROWS);
   const [importError, setImportError] = useState<string | null>(null);
 
   const allData = useMemo(() => subgroups.flatMap((subgroup) => subgroup.values), [subgroups]);
@@ -306,33 +319,29 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
     setSubgroups(subgroups.filter((subgroup) => subgroup.id !== id));
   };
 
-  const handleGenerateSample = () => {
+  const handleGenerateAutomaticRows = () => {
+    const rowCount = Number.isFinite(autoFillRows)
+      ? Math.min(MAX_AUTO_FILL_ROWS, Math.max(1, Math.round(autoFillRows)))
+      : DEFAULT_AUTO_FILL_ROWS;
+    const center = Number.isFinite(nominal) ? nominal : 0;
+    const spread =
+      Number.isFinite(lsl) && Number.isFinite(usl) && lsl !== usl
+        ? Math.abs(usl - lsl) * 0.1
+        : Math.max(Math.abs(center) * 0.02, 0.2);
+
+    setAutoFillRows(rowCount);
+    setSubgroupSize(AUTO_FILL_COLUMN_COUNT);
     setSubgroups(
-      Array.from({ length: 15 }, (_, index) => ({
+      Array.from({ length: rowCount }, (_, index) => ({
         id: index + 1,
-        values: Array.from({ length: subgroupSize }, () => nominal + (Math.random() * 0.4 - 0.2)),
+        values: Array.from({ length: AUTO_FILL_COLUMN_COUNT }, () =>
+          Number((center + (Math.random() * 2 - 1) * spread).toFixed(4))
+        ),
       }))
     );
     setSelectedDist(undefined);
-  };
-
-  const handleBulkImport = () => {
-    try {
-      const rows = bulkData
-        .trim()
-        .split('\n')
-        .map((line) => line.split(/[\t,; ]+/));
-      const newSubgroups = normalizeRowsToSubgroups(rows, subgroupSize, nominal);
-      if (newSubgroups.length > 0) {
-        setSubgroups(newSubgroups);
-        setShowBulkImport(false);
-        setBulkData('');
-        setSelectedDist(undefined);
-        setImportError(null);
-      }
-    } catch {
-      setImportError(t.importError);
-    }
+    setImportError(null);
+    setActiveDataTab('manual');
   };
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -351,6 +360,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
         setSubgroups(newSubgroups);
         setSelectedDist(undefined);
         setImportError(null);
+        setActiveDataTab('manual');
       } else {
         setImportError(t.excelError);
       }
@@ -485,155 +495,172 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
             </div>
           </section>
 
-          <section id="print-sidebar-hide" className="space-y-3">
+          <section id="print-sidebar-hide" className="min-h-0 space-y-3 pb-[30px]">
             <div className="flex items-center justify-between gap-3">
               <h2 className="app-label flex items-center gap-2">
                 <TableIcon className="h-4 w-4 app-text-primary" />
                 {t.dataEntry}
               </h2>
-              <span className="app-badge app-badge-primary">{validMeasurementCount}</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleGenerateSample}
-                className="app-button app-button-secondary px-3 py-2 text-xs"
-              >
-                {t.sample}
-              </button>
-              <button
-                type="button"
-                onClick={handleAddSubgroup}
-                className="app-button app-button-primary px-3 py-2 text-xs"
-              >
-                <Plus size={15} />
-                {t.add}
-              </button>
-              <label className="app-button app-button-success px-3 py-2 text-xs">
-                <Upload size={15} />
-                {t.excelImport}
-                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileUpload} />
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowBulkImport(!showBulkImport)}
-                className="app-button app-button-secondary px-3 py-2 text-xs"
-              >
-                {t.bulkImport}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSubgroups([]);
-                setSelectedDist(undefined);
-              }}
-              className="app-button app-button-danger w-full px-3 py-2 text-xs"
-            >
-              {t.clear}
-            </button>
-
-            <AnimatePresence>
-              {showBulkImport && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="app-badge app-badge-primary">{validMeasurementCount}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubgroups([]);
+                    setSelectedDist(undefined);
+                    setImportError(null);
+                  }}
+                  className="app-button app-button-danger px-3 py-1.5 text-xs"
                 >
-                  <div className="app-callout">
-                    <label className="app-label">{t.bulkLabel}</label>
-                    <textarea
-                      value={bulkData}
-                      onChange={(event) => setBulkData(event.target.value)}
-                      placeholder={'10.1 10.2 9.8 10.0 10.1\n9.9 10.3 10.1 9.7 10.2'}
-                      className="app-input mb-3 h-28 p-3 font-mono text-xs"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowBulkImport(false)}
-                        className="app-button app-button-secondary px-3 py-2 text-xs"
-                      >
-                        {t.cancel}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleBulkImport}
-                        className="app-button app-button-primary px-3 py-2 text-xs"
-                      >
-                        {t.import}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {importError && <p className="text-sm app-text-danger">{importError}</p>}
-          </section>
-
-          <section className="min-h-0 space-y-3 pb-[30px]">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="app-label flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4 app-text-primary" />
-                {t.config}
-              </h2>
-              <span className="app-badge">{subgroups.length}</span>
+                  {t.clear}
+                </button>
+              </div>
             </div>
 
-            <div className="app-table-shell max-h-[44vh] overflow-auto pb-4">
-              <table className="min-w-[360px] w-full text-left text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="app-table-head">
-                    <th className="px-3 py-3 text-xs font-bold uppercase w-16">{t.id}</th>
-                    {Array.from({ length: subgroupSize }).map((_, index) => (
-                      <th key={index} className="px-2 py-3 text-xs font-bold uppercase min-w-24">
-                        {index + 1}
-                      </th>
-                    ))}
-                    <th className="px-2 py-3 w-12" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {subgroups.map((subgroup) => (
-                    <tr key={subgroup.id}>
-                      <td className="px-3 py-2 font-mono text-xs app-muted font-bold">#{subgroup.id}</td>
-                      {subgroup.values.map((value, index) => (
-                        <td key={index} className="px-2 py-2">
-                          <input
-                            type="number"
-                            step="any"
-                            value={Number.isNaN(value) ? '' : value}
-                            onChange={(event) => handleValueChange(subgroup.id, index, event.target.value)}
-                            className="app-input px-2 py-2 text-xs font-medium"
-                          />
-                        </td>
+            <div className="app-tabs app-tabs-stretch">
+              {([
+                { id: 'manual', label: t.manualTab, icon: TableIcon },
+                { id: 'file', label: t.fileTab, icon: Upload },
+                { id: 'auto', label: t.autoTab, icon: TrendingUp },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveDataTab(id)}
+                  className={`app-tab min-w-0 !px-2 !text-xs ${activeDataTab === id ? 'app-tab-active' : ''}`}
+                  aria-pressed={activeDataTab === id}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 truncate">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            {activeDataTab === 'manual' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="app-label flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4 app-text-primary" />
+                    {t.config}
+                  </h2>
+                  <span className="app-badge">{subgroups.length}</span>
+                </div>
+
+                <div className="app-table-shell max-h-[44vh] overflow-auto pb-4">
+                  <table className="min-w-[360px] w-full text-left text-sm">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="app-table-head">
+                        <th className="px-3 py-3 text-xs font-bold uppercase w-16">{t.id}</th>
+                        {Array.from({ length: subgroupSize }).map((_, index) => (
+                          <th key={index} className="px-2 py-3 text-xs font-bold uppercase min-w-24">
+                            {index + 1}
+                          </th>
+                        ))}
+                        <th className="px-2 py-3 w-12" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {subgroups.map((subgroup) => (
+                        <tr key={subgroup.id}>
+                          <td className="px-3 py-2 font-mono text-xs app-muted font-bold">#{subgroup.id}</td>
+                          {subgroup.values.map((value, index) => (
+                            <td key={index} className="px-2 py-2">
+                              <input
+                                type="number"
+                                step="any"
+                                value={Number.isNaN(value) ? '' : value}
+                                onChange={(event) => handleValueChange(subgroup.id, index, event.target.value)}
+                                className="app-input px-2 py-2 text-xs font-medium"
+                              />
+                            </td>
+                          ))}
+                          <td className="px-2 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSubgroup(subgroup.id)}
+                              className="app-button app-button-danger h-8 w-8"
+                              aria-label="Remove subgroup"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                      <td className="px-2 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSubgroup(subgroup.id)}
-                          className="app-button app-button-danger h-8 w-8"
-                          aria-label="Remove subgroup"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!subgroups.length && (
-                    <tr>
-                      <td colSpan={subgroupSize + 2} className="px-3 py-8 text-center text-sm app-muted">
-                        {lang === 'es' ? 'Agrega o importa datos para analizar.' : 'Add or import data to analyze.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      <tr>
+                        <td colSpan={subgroupSize + 2} className="px-3 py-4 text-center">
+                          {subgroups.length ? (
+                            <button
+                              type="button"
+                              onClick={handleAddSubgroup}
+                              className="app-button app-button-primary mx-auto px-3 py-2 text-xs"
+                            >
+                              <Plus size={15} />
+                              {t.addNewRow}
+                            </button>
+                          ) : (
+                            <div className="flex flex-col items-center gap-3">
+                              <span className="text-sm app-muted">{t.emptyDataText}</span>
+                              <button
+                                type="button"
+                                onClick={handleAddSubgroup}
+                                className="app-button app-button-primary px-3 py-2 text-xs"
+                              >
+                                <Plus size={15} />
+                                {t.addNewRow}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeDataTab === 'file' && (
+              <div className="space-y-3">
+                <h2 className="app-label flex items-center gap-2">
+                  <Upload className="h-4 w-4 app-text-primary" />
+                  {t.fileImportTitle}
+                </h2>
+                <label className="app-button app-button-success w-full px-3 py-3 text-sm">
+                  <Upload size={16} />
+                  {t.fileImportCta}
+                  <input type="file" accept=".xlsx,.csv" className="hidden" onChange={handleFileUpload} />
+                </label>
+                {importError && <p className="text-sm app-text-danger">{importError}</p>}
+              </div>
+            )}
+
+            {activeDataTab === 'auto' && (
+              <div className="space-y-3">
+                <h2 className="app-label flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 app-text-primary" />
+                  {t.autoFillTitle}
+                </h2>
+                <label className="block">
+                  <span className="app-label">{t.autoRowsLabel}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_AUTO_FILL_ROWS}
+                    step={1}
+                    value={Number.isNaN(autoFillRows) ? '' : autoFillRows}
+                    onChange={(event) => setAutoFillRows(parseNumberInput(event.target.value))}
+                    className="app-input px-3 py-2.5 text-sm font-medium"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGenerateAutomaticRows}
+                  className="app-button app-button-primary w-full px-3 py-2.5 text-sm"
+                >
+                  <Plus size={16} />
+                  {t.generate}
+                </button>
+              </div>
+            )}
           </section>
         </>
       }
