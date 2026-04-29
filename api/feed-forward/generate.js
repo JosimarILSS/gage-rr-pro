@@ -80,6 +80,39 @@ const getBody = async (req) => {
   return raw ? JSON.parse(raw) : {};
 };
 
+const getErrorMessage = (error) => {
+  if (!error) return '';
+  if (typeof error.message === 'string') return error.message;
+  if (typeof error.toString === 'function') return error.toString();
+  return '';
+};
+
+const getGeminiClientError = (error) => {
+  const message = getErrorMessage(error).toLowerCase();
+  const status = Number(error?.status || error?.code || error?.response?.status);
+
+  if (status === 400 || message.includes('api key not valid')) {
+    return 'La API key de Gemini no es válida o no corresponde al proyecto configurado.';
+  }
+
+  if (
+    status === 403 ||
+    status === 404 ||
+    message.includes('not found') ||
+    message.includes('not supported') ||
+    message.includes('permission') ||
+    message.includes('access')
+  ) {
+    return 'El modelo de Gemini configurado no está disponible para esta API key. Revisa GEMINI_MODEL o habilita billing en Google AI Studio.';
+  }
+
+  if (status === 429 || message.includes('quota') || message.includes('resource_exhausted')) {
+    return 'Se alcanzó el límite de cuota de Gemini para este modelo o proyecto.';
+  }
+
+  return 'No se pudo generar la sesión con Gemini. Revisa los logs de Vercel para ver el detalle.';
+};
+
 const buildPrompt = ({
   lang,
   personName,
@@ -203,7 +236,7 @@ module.exports = async function handler(req, res) {
 
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey });
-    const model = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -218,6 +251,6 @@ module.exports = async function handler(req, res) {
     res.status(200).json({ feedback });
   } catch (error) {
     console.error('[feed-forward] Generation failed:', error);
-    res.status(500).json({ error: 'Could not generate the FeedFoward session.' });
+    res.status(500).json({ error: getGeminiClientError(error) });
   }
 };
