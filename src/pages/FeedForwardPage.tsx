@@ -286,7 +286,9 @@ const splitPdfText = (state: PdfRenderState, value: string, width: number) =>
 const measurePdfText = (state: PdfRenderState, text: string, fontSize: number, bold: boolean) => {
   state.pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   state.pdf.setFontSize(fontSize);
-  return state.pdf.getTextWidth(text);
+  const measuredWidth = state.pdf.getTextWidth(text);
+  if (text.trim() || measuredWidth > 0) return measuredWidth;
+  return text.length * fontSize * 0.28;
 };
 
 const layoutPdfRichLines = (
@@ -311,21 +313,19 @@ const layoutPdfRichLines = (
 
   parseInlineMarkdown(text).forEach((run) => {
     const bold = forceBold || run.bold;
-    const tokens = run.text.split(/(\s+)/).filter(Boolean);
+    const words = run.text.trim().split(/\s+/).filter(Boolean);
 
-    tokens.forEach((token) => {
-      const isWhitespace = /^\s+$/.test(token);
-      if (isWhitespace && currentLine.length === 0) return;
-
-      const tokenText = isWhitespace ? ' ' : token;
+    words.forEach((word) => {
+      const tokenText = currentLine.length ? ` ${word}` : word;
       const tokenWidth = measurePdfText(state, tokenText, fontSize, bold);
 
-      if (!isWhitespace && currentLine.length > 0 && currentWidth + tokenWidth > width) {
+      if (currentLine.length > 0 && currentWidth + tokenWidth > width) {
         pushLine();
       }
 
-      currentLine.push({ text: tokenText, bold });
-      currentWidth += tokenWidth;
+      const lineTokenText = currentLine.length ? tokenText : word;
+      currentLine.push({ text: lineTokenText, bold });
+      currentWidth += measurePdfText(state, lineTokenText, fontSize, bold);
     });
   });
 
@@ -350,9 +350,7 @@ const drawPdfRichLine = (
     state.pdf.setFont('helvetica', run.bold ? 'bold' : 'normal');
     state.pdf.setFontSize(options.fontSize);
     state.pdf.setTextColor(...(run.bold ? options.boldColor : options.normalColor));
-    if (run.text.trim()) {
-      state.pdf.text(run.text, cursorX, y);
-    }
+    state.pdf.text(run.text, cursorX, y);
     cursorX += measurePdfText(state, run.text, options.fontSize, run.bold);
   });
 };
