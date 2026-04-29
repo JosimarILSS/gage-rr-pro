@@ -9,6 +9,7 @@ import {
   KeyRound,
   LogOut,
   Mail,
+  MessageSquare,
   ShieldCheck,
   TrendingUp,
   UserCircle,
@@ -32,6 +33,7 @@ type ToolsPageProps = {
   onUnlockPremium: () => Promise<void>;
   onOpenGageRR: () => void;
   onOpenSixSigma: () => void;
+  onOpenFeedForward: () => void;
   showAdminAccessButton?: boolean;
   onGoToAdminAccess?: () => void;
 };
@@ -75,6 +77,7 @@ export default function ToolsPage({
   onUnlockPremium,
   onOpenGageRR,
   onOpenSixSigma,
+  onOpenFeedForward,
   showAdminAccessButton = false,
   onGoToAdminAccess,
 }: ToolsPageProps) {
@@ -90,6 +93,9 @@ export default function ToolsPage({
       sixSigmaTitle: 'Six Sigma Master',
       sixSigmaDescription:
         'Analiza capacidad de proceso, gráficas de control, normalidad, histogramas y distribuciones sugeridas.',
+      feedForwardTitle: 'ILSS FeedFoward',
+      feedForwardDescription:
+        'Convierte observaciones de desempeño en una sesión de retroalimentación estructurada y lista para entregar.',
       openTool: 'Abrir herramienta',
       profileTitle: 'Mi perfil',
       account: 'Cuenta',
@@ -133,6 +139,9 @@ export default function ToolsPage({
       sixSigmaTitle: 'Six Sigma Master',
       sixSigmaDescription:
         'Analyze process capability, control charts, normality, histograms, and suggested distributions.',
+      feedForwardTitle: 'ILSS FeedFoward',
+      feedForwardDescription:
+        'Turn performance observations into a structured feedback session ready to deliver.',
       openTool: 'Open tool',
       profileTitle: 'My profile',
       account: 'Account',
@@ -273,6 +282,31 @@ export default function ToolsPage({
               <div className="mt-5 flex-1">
                 <h3 className="text-lg app-title">{copy.sixSigmaTitle}</h3>
                 <p className="text-sm app-muted mt-2 leading-6">{copy.sixSigmaDescription}</p>
+              </div>
+
+              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
+                {copy.openTool}
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenFeedForward}
+              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="app-icon-tile app-icon-tile-lg app-icon-tile-warning">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+                <span className="app-badge app-badge-success">
+                  {copy.toolStatus}
+                </span>
+              </div>
+
+              <div className="mt-5 flex-1">
+                <h3 className="text-lg app-title">{copy.feedForwardTitle}</h3>
+                <p className="text-sm app-muted mt-2 leading-6">{copy.feedForwardDescription}</p>
               </div>
 
               <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">

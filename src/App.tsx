@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import AnalysisPage from './pages/AnalysisPage';
 import ToolsPage from './pages/ToolsPage';
 import SixSigmaPage from './pages/SixSigmaPage';
+import FeedForwardPage from './pages/FeedForwardPage';
 import AdminAccessGatePage from './pages/AdminAccessGatePage';
 import AdminUserAccessPage from './pages/AdminUserAccessPage';
 import type { Lang } from './types/common';
@@ -14,6 +15,7 @@ const ADMIN_ROUTE = '/admin_user_access';
 const TOOLS_ROUTE = '/';
 const GAGE_RR_TOOL_ROUTE = '/tools/gage-rr';
 const SIX_SIGMA_TOOL_ROUTE = '/tools/six-sigma';
+const FEED_FORWARD_TOOL_ROUTE = '/tools/feed-forward';
 
 const parseAllowedAdminEmails = (rawValue?: string): string[] =>
   (rawValue || '')
@@ -35,6 +37,7 @@ export default function App() {
   const isAdminRoute = pathname === ADMIN_ROUTE;
   const isGageRRToolRoute = pathname === GAGE_RR_TOOL_ROUTE;
   const isSixSigmaToolRoute = pathname === SIX_SIGMA_TOOL_ROUTE;
+  const isFeedForwardToolRoute = pathname === FEED_FORWARD_TOOL_ROUTE;
   const loggedEmail = (authSession.user?.email || '').toLowerCase();
   const canSeeAdminEntry =
     allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
@@ -144,6 +147,17 @@ export default function App() {
     );
   }
 
+  if (isFeedForwardToolRoute) {
+    return (
+      <FeedForwardPage
+        lang={lang}
+        onToggleLang={toggleLang}
+        onBackToTools={() => navigateTo(TOOLS_ROUTE)}
+        getIdToken={() => authSession.user!.getIdToken()}
+      />
+    );
+  }
+
   return (
     <ToolsPage
       lang={lang}
@@ -160,6 +174,7 @@ export default function App() {
       onUnlockPremium={authSession.handleUnlockPremium}
       onOpenGageRR={() => navigateTo(GAGE_RR_TOOL_ROUTE)}
       onOpenSixSigma={() => navigateTo(SIX_SIGMA_TOOL_ROUTE)}
+      onOpenFeedForward={() => navigateTo(FEED_FORWARD_TOOL_ROUTE)}
       showAdminAccessButton={canSeeAdminEntry}
       onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
     />
