@@ -14,6 +14,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import SidebarLayout from '../layouts/SidebarLayout';
+import Modal from '../components/common/Modal';
 import { generateFeedForwardSession } from '../services/feed-forward';
 import type { Lang } from '../types/common';
 
@@ -115,6 +116,8 @@ export default function FeedForwardPage({
   const [companyDirectives, setCompanyDirectives] = useState('');
   const [textInputs, setTextInputs] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
@@ -145,6 +148,14 @@ export default function FeedForwardPage({
       generating: 'Generando FeedFoward...',
       result: 'Resultado de la sesión',
       download: 'Descargar PDF',
+      downloadTitle: 'Descargar PDF',
+      downloadIntro: 'Selecciona qué información quieres incluir en el documento.',
+      downloadComplete: 'Datos ingresados y resultado generado',
+      downloadCompleteDescription:
+        'Incluye primero todos los datos capturados en vertical y después la sesión generada.',
+      downloadGeneratedOnly: 'Solo resultado generado',
+      downloadGeneratedOnlyDescription: 'Genera el PDF como hasta ahora, únicamente con la respuesta de la IA.',
+      downloading: 'Generando PDF...',
       emptyTitle: 'Sin sesión generada',
       emptyBody: 'Completa el formulario y genera una hoja de ruta lista para conversar con el miembro del equipo.',
       nameError: 'Por favor, ingresa el nombre de la persona.',
@@ -172,6 +183,13 @@ export default function FeedForwardPage({
       generating: 'Generating FeedFoward...',
       result: 'Session result',
       download: 'Download PDF',
+      downloadTitle: 'Download PDF',
+      downloadIntro: 'Choose what information to include in the document.',
+      downloadComplete: 'Entered data and generated result',
+      downloadCompleteDescription: 'Includes all captured data vertically first, followed by the generated session.',
+      downloadGeneratedOnly: 'Generated result only',
+      downloadGeneratedOnlyDescription: 'Generates the PDF as before, only with the AI response.',
+      downloading: 'Generating PDF...',
       emptyTitle: 'No session generated',
       emptyBody: 'Complete the form and generate a conversation-ready roadmap for the team member.',
       nameError: 'Please enter the person name.',
@@ -184,6 +202,9 @@ export default function FeedForwardPage({
   const currentFields = METHODOLOGY_FIELDS[methodology];
   const hasFeedbackText = currentFields.some((field) => (textInputs[field.id] || '').trim().length > 0);
   const canGenerate = personName.trim().length > 0 && hasFeedbackText && !isGenerating;
+  const selectedMethodology = METHODOLOGIES.find((item) => item.id === methodology)?.name || methodology;
+  const selectedGeneration = GENERATIONS.find((item) => item.id === generation)?.name || generation;
+  const selectedPersonality = PERSONALITIES.find((item) => item.id === personality)?.name || personality;
 
   const generateFeedback = async () => {
     if (!personName.trim()) {
@@ -220,50 +241,112 @@ export default function FeedForwardPage({
     }
   };
 
-  const downloadPDF = async () => {
+  const applyPdfStyles = (captureNode: HTMLElement) => {
+    captureNode.style.position = 'absolute';
+    captureNode.style.left = '-9999px';
+    captureNode.style.top = '0';
+    captureNode.style.width = '800px';
+    captureNode.style.backgroundColor = '#ffffff';
+    captureNode.style.padding = '40px';
+    captureNode.className = '';
+
+    const allElements = captureNode.querySelectorAll('*');
+    allElements.forEach((node) => {
+      if (!(node instanceof HTMLElement)) return;
+
+      const tag = node.tagName.toLowerCase();
+      node.className = '';
+      if (tag === 'h1') {
+        node.style.cssText =
+          'font-size: 24px; font-weight: bold; margin: 0 0 20px; color: #0f172a; font-family: sans-serif;';
+      } else if (tag === 'h2') {
+        node.style.cssText =
+          'font-size: 20px; font-weight: bold; margin: 24px 0 12px; color: #0f172a; font-family: sans-serif;';
+      } else if (tag === 'h3') {
+        node.style.cssText =
+          'font-size: 18px; font-weight: bold; margin: 20px 0 10px; color: #0f172a; font-family: sans-serif;';
+      } else if (tag === 'p') {
+        node.style.cssText =
+          'font-size: 14px; line-height: 1.6; margin: 0 0 12px; color: #334155; font-family: sans-serif;';
+      } else if (tag === 'strong' || tag === 'b') {
+        node.style.cssText = 'font-weight: normal; color: #0f172a;';
+      } else if (tag === 'ul' || tag === 'ol') {
+        node.style.cssText = 'margin: 0 0 12px; padding-left: 24px; font-family: sans-serif;';
+      } else if (tag === 'li') {
+        node.style.cssText =
+          'font-size: 14px; line-height: 1.5; margin-bottom: 6px; color: #334155; font-family: sans-serif;';
+      } else if (tag === 'hr') {
+        node.style.display = 'none';
+      }
+    });
+  };
+
+  const createSummaryField = (label: string, value: string) => {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-bottom: 16px;';
+
+    const title = document.createElement('div');
+    title.textContent = label;
+    title.style.cssText =
+      'font-size: 11px; line-height: 1.4; margin: 0 0 4px; color: #64748b; font-weight: bold; text-transform: uppercase; font-family: sans-serif;';
+
+    const body = document.createElement('div');
+    body.textContent = value.trim() || 'No especificado';
+    body.style.cssText =
+      'font-size: 14px; line-height: 1.6; margin: 0; color: #0f172a; white-space: pre-wrap; font-family: sans-serif;';
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(body);
+    return wrapper;
+  };
+
+  const createFullPdfNode = () => {
+    if (!feedbackRef.current) return null;
+
+    const container = document.createElement('div');
+    const inputSection = document.createElement('section');
+    inputSection.style.cssText = 'margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0;';
+
+    const title = document.createElement('h1');
+    title.textContent = copy.config;
+    inputSection.appendChild(title);
+
+    inputSection.appendChild(createSummaryField(copy.personName, personName));
+    inputSection.appendChild(createSummaryField(copy.generation, selectedGeneration));
+    inputSection.appendChild(createSummaryField(copy.personality, selectedPersonality));
+    inputSection.appendChild(createSummaryField(`${copy.directives} (${copy.directivesOptional})`, companyDirectives));
+    inputSection.appendChild(createSummaryField(copy.methodology, selectedMethodology));
+
+    const detailsTitle = document.createElement('h2');
+    detailsTitle.textContent = copy.details;
+    inputSection.appendChild(detailsTitle);
+
+    currentFields.forEach((field) => {
+      inputSection.appendChild(createSummaryField(field.label, textInputs[field.id] || ''));
+    });
+
+    const resultTitle = document.createElement('h1');
+    resultTitle.textContent = copy.result;
+
+    const feedbackNode = feedbackRef.current.cloneNode(true) as HTMLElement;
+    container.appendChild(inputSection);
+    container.appendChild(resultTitle);
+    container.appendChild(feedbackNode);
+    return container;
+  };
+
+  const downloadPDF = async (includeInputData = false) => {
     if (!feedbackRef.current) return;
 
     let captureNode: HTMLElement | null = null;
 
     try {
-      captureNode = feedbackRef.current.cloneNode(true) as HTMLElement;
-      captureNode.style.position = 'absolute';
-      captureNode.style.left = '-9999px';
-      captureNode.style.top = '0';
-      captureNode.style.width = '800px';
-      captureNode.style.backgroundColor = '#ffffff';
-      captureNode.style.padding = '40px';
-      captureNode.className = '';
+      setIsDownloadingPdf(true);
+      setIsPdfModalOpen(false);
+      captureNode = includeInputData ? createFullPdfNode() : (feedbackRef.current.cloneNode(true) as HTMLElement);
+      if (!captureNode) return;
 
-      const allElements = captureNode.querySelectorAll('*');
-      allElements.forEach((node) => {
-        if (!(node instanceof HTMLElement)) return;
-
-        const tag = node.tagName.toLowerCase();
-        node.className = '';
-        if (tag === 'h1') {
-          node.style.cssText =
-            'font-size: 24px; font-weight: bold; margin: 0 0 20px; color: #0f172a; font-family: sans-serif;';
-        } else if (tag === 'h2') {
-          node.style.cssText =
-            'font-size: 20px; font-weight: bold; margin: 24px 0 12px; color: #0f172a; font-family: sans-serif;';
-        } else if (tag === 'h3') {
-          node.style.cssText =
-            'font-size: 18px; font-weight: bold; margin: 20px 0 10px; color: #0f172a; font-family: sans-serif;';
-        } else if (tag === 'p') {
-          node.style.cssText =
-            'font-size: 14px; line-height: 1.6; margin: 0 0 12px; color: #334155; font-family: sans-serif;';
-        } else if (tag === 'strong' || tag === 'b') {
-          node.style.cssText = 'font-weight: normal; color: #0f172a;';
-        } else if (tag === 'ul' || tag === 'ol') {
-          node.style.cssText = 'margin: 0 0 12px; padding-left: 24px; font-family: sans-serif;';
-        } else if (tag === 'li') {
-          node.style.cssText =
-            'font-size: 14px; line-height: 1.5; margin-bottom: 6px; color: #334155; font-family: sans-serif;';
-        } else if (tag === 'hr') {
-          node.style.display = 'none';
-        }
-      });
+      applyPdfStyles(captureNode);
 
       document.body.appendChild(captureNode);
 
@@ -300,11 +383,13 @@ export default function FeedForwardPage({
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`FeedFoward_${personName.trim().replace(/\s+/g, '_') || 'Plan'}.pdf`);
+      const fileSuffix = includeInputData ? 'Completo' : 'Resultado';
+      pdf.save(`FeedFoward_${fileSuffix}_${personName.trim().replace(/\s+/g, '_') || 'Plan'}.pdf`);
     } catch (err) {
       const message = getErrorMessage(err);
       setError(message ? `${copy.pdfError} ${message}` : copy.pdfError);
     } finally {
+      setIsDownloadingPdf(false);
       if (captureNode?.parentNode) {
         captureNode.parentNode.removeChild(captureNode);
       }
@@ -509,11 +594,21 @@ export default function FeedForwardPage({
                 </h2>
                 <button
                   type="button"
-                  onClick={downloadPDF}
+                  onClick={() => setIsPdfModalOpen(true)}
+                  disabled={isDownloadingPdf}
                   className="app-button app-button-secondary px-4 py-2.5 text-sm"
                 >
-                  <FileDown className="w-4 h-4" />
-                  {copy.download}
+                  {isDownloadingPdf ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {copy.downloading}
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="w-4 h-4" />
+                      {copy.download}
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -554,6 +649,44 @@ export default function FeedForwardPage({
           )}
         </AnimatePresence>
       </div>
+
+      <Modal isOpen={isPdfModalOpen} title={copy.downloadTitle} onClose={() => setIsPdfModalOpen(false)}>
+        <div className="space-y-4">
+          <p className="text-sm app-muted leading-6">{copy.downloadIntro}</p>
+
+          <button
+            type="button"
+            onClick={() => downloadPDF(true)}
+            disabled={isDownloadingPdf}
+            className="w-full text-left app-card app-card-hover p-4 cursor-pointer"
+          >
+            <span className="flex items-start gap-3">
+              <FileDown className="w-5 h-5 app-text-primary shrink-0 mt-0.5" />
+              <span>
+                <span className="block app-title text-sm">{copy.downloadComplete}</span>
+                <span className="block text-sm app-muted mt-1 leading-6">{copy.downloadCompleteDescription}</span>
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => downloadPDF(false)}
+            disabled={isDownloadingPdf}
+            className="w-full text-left app-card app-card-hover p-4 cursor-pointer"
+          >
+            <span className="flex items-start gap-3">
+              <FileDown className="w-5 h-5 app-text-primary shrink-0 mt-0.5" />
+              <span>
+                <span className="block app-title text-sm">{copy.downloadGeneratedOnly}</span>
+                <span className="block text-sm app-muted mt-1 leading-6">
+                  {copy.downloadGeneratedOnlyDescription}
+                </span>
+              </span>
+            </span>
+          </button>
+        </div>
+      </Modal>
     </SidebarLayout>
   );
 }
