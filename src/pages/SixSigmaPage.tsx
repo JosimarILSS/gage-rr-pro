@@ -53,12 +53,6 @@ const AUTO_FILL_COLUMN_COUNT = 5;
 const DEFAULT_AUTO_FILL_ROWS = 15;
 const MAX_AUTO_FILL_ROWS = 500;
 
-const createInitialSubgroups = (): SubgroupData[] =>
-  Array.from({ length: 10 }, (_, index) => ({
-    id: index + 1,
-    values: Array.from({ length: 5 }, () => 10 + Math.random() * 2 - 1),
-  }));
-
 const translations = {
   es: {
     title: 'Six Sigma Master',
@@ -74,7 +68,7 @@ const translations = {
     dataEntry: 'Entrada de Datos',
     manualTab: 'Manual',
     fileTab: 'Excel/CSV',
-    autoTab: 'Automático',
+    autoTab: 'Automático y Aleatorio',
     clear: 'Limpiar',
     addNewRow: 'Agregar nueva fila',
     emptyDataText: 'Agrega o importa datos para analizar.',
@@ -275,7 +269,7 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
   const [usl, setUsl] = useState<number>(11);
   const [nominal, setNominal] = useState<number>(10);
   const [subgroupSize, setSubgroupSize] = useState<number>(5);
-  const [subgroups, setSubgroups] = useState<SubgroupData[]>(createInitialSubgroups);
+  const [subgroups, setSubgroups] = useState<SubgroupData[]>([]);
   const [selectedDist, setSelectedDist] = useState<string | undefined>(undefined);
   const [activeDataTab, setActiveDataTab] = useState<DataEntryTab>('manual');
   const [autoFillRows, setAutoFillRows] = useState<number>(DEFAULT_AUTO_FILL_ROWS);
@@ -546,6 +540,15 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                   <span className="app-badge">{subgroups.length}</span>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={handleAddSubgroup}
+                  className="app-button app-button-primary w-full px-3 py-2 text-xs"
+                >
+                  <Plus size={15} />
+                  {t.addNewRow}
+                </button>
+
                 <div className="app-table-shell max-h-[44vh] overflow-auto pb-4">
                   <table className="min-w-[360px] w-full text-left text-sm">
                     <thead className="sticky top-0 z-10">
@@ -586,34 +589,16 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                           </td>
                         </tr>
                       ))}
-                      <tr>
-                        <td colSpan={subgroupSize + 2} className="px-3 py-4 text-center">
-                          {subgroups.length ? (
-                            <button
-                              type="button"
-                              onClick={handleAddSubgroup}
-                              className="app-button app-button-primary mx-auto px-3 py-2 text-xs"
-                            >
-                              <Plus size={15} />
-                              {t.addNewRow}
-                            </button>
-                          ) : (
-                            <div className="flex flex-col items-center gap-3">
-                              <span className="text-sm app-muted">{t.emptyDataText}</span>
-                              <button
-                                type="button"
-                                onClick={handleAddSubgroup}
-                                className="app-button app-button-primary px-3 py-2 text-xs"
-                              >
-                                <Plus size={15} />
-                                {t.addNewRow}
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                      {!subgroups.length && (
+                        <tr>
+                          <td colSpan={subgroupSize + 2} className="px-3 py-8 text-center text-sm app-muted">
+                            {t.emptyDataText}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
+                  <div className="h-12" aria-hidden="true" />
                 </div>
               </div>
             )}
