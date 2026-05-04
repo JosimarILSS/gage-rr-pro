@@ -1,6 +1,7 @@
 import { doc, getDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { db } from '../firebase';
+import { normalizeToolFlags, type ToolFlags } from '../config/tools';
 import type { Lang } from '../types/common';
 
 export type UserAccountProfile = {
@@ -13,6 +14,9 @@ export type UserAccountProfile = {
   premiumUnlimited: boolean;
   premiumGrantedAt: number | null;
   premiumExpiresAt: number | null;
+  toolAccess: ToolFlags;
+  premiumTools: ToolFlags;
+  toolPremiumActive: ToolFlags;
   createdAt: number | null;
 };
 
@@ -53,6 +57,20 @@ const buildProfile = (
   const createdAt = toTimestampMs(data.createdAt);
   const premiumUnlimited = premium && (expirationRaw === null || expirationRaw === undefined);
   const premiumActive = premium && (premiumUnlimited || (premiumExpiresAt !== null && Date.now() < premiumExpiresAt));
+  const toolAccess = normalizeToolFlags(
+    (data.toolAccess as Record<string, unknown> | undefined) || (claims.toolAccess as Record<string, unknown> | undefined),
+    true
+  );
+  const premiumTools = normalizeToolFlags(
+    (data.premiumTools as Record<string, unknown> | undefined) || (claims.premiumTools as Record<string, unknown> | undefined),
+    true
+  );
+  const toolPremiumActive = normalizeToolFlags(
+    Object.fromEntries(
+      Object.entries(premiumTools).map(([toolId, enabled]) => [toolId, premiumActive && enabled])
+    ),
+    false
+  );
 
   return {
     uid: user.uid,
@@ -64,6 +82,9 @@ const buildProfile = (
     premiumUnlimited,
     premiumGrantedAt,
     premiumExpiresAt,
+    toolAccess,
+    premiumTools,
+    toolPremiumActive,
     createdAt,
   };
 };

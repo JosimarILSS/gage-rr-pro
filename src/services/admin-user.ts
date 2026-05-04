@@ -1,9 +1,13 @@
+import type { ToolFlags } from '../config/tools';
+
 type ManageUserAccessPayload = {
   email: string;
   displayName?: string;
-  premium: boolean;
-  unlimited: boolean;
+  premium?: boolean;
+  unlimited?: boolean;
   months?: number;
+  toolAccess?: ToolFlags;
+  premiumTools?: ToolFlags;
 };
 
 type AdminSearchField = 'all' | 'email' | 'displayName';
@@ -19,6 +23,8 @@ type AdminListedUser = {
   premiumUnlimited: boolean;
   premiumGrantedAt: string | null;
   premiumExpiresAt: string | null;
+  toolAccess: ToolFlags;
+  premiumTools: ToolFlags;
   createdAt: string | null;
   lastSignInAt: string | null;
 };
@@ -40,6 +46,8 @@ type ManageUserAccessResult = {
   monthsApplied: number | null;
   expiresAt: string | null;
   premiumGrantedAt: string | null;
+  toolAccess: ToolFlags;
+  premiumTools: ToolFlags;
 };
 
 type ListAdminUsersParams = {

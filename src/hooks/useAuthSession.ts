@@ -16,6 +16,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import { getAuthErrorMessage, getUserAccountProfile, type UserAccountProfile } from '../services/auth';
+import { isToolEnabled } from '../config/tools';
 import {
   confirmCheckoutSession,
   createCheckoutSession,
@@ -66,7 +67,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const refreshAccountProfile = useCallback(async (targetUser: User | null) => {
     const profile = await getUserAccountProfile(targetUser);
     setAccountProfile(profile);
-    setEsPremium(profile?.premiumActive === true);
+    setEsPremium(profile?.premiumActive === true && isToolEnabled(profile?.premiumTools, 'gage-rr', true));
     return profile;
   }, []);
 

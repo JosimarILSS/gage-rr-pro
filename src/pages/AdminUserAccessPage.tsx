@@ -10,6 +10,7 @@ import {
   type ManageUserAccessResult,
 } from '../services/admin-user';
 import { auth } from '../firebase';
+import { PLATFORM_TOOLS, buildDefaultToolFlags, normalizeToolFlags, type ToolFlags, type ToolId } from '../config/tools';
 
 type AdminUserAccessPageProps = {
   adminEmail: string;
@@ -22,6 +23,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
   const [newUserDisplayName, setNewUserDisplayName] = useState('');
   const [newUserAccessMode, setNewUserAccessMode] = useState<'months' | 'vip' | 'none'>('months');
   const [newUserMonthsInput, setNewUserMonthsInput] = useState('6');
+  const [newUserToolAccess, setNewUserToolAccess] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
+  const [newUserPremiumTools, setNewUserPremiumTools] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   const [users, setUsers] = useState<AdminListedUser[]>([]);
@@ -30,6 +33,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeActionKey, setActiveActionKey] = useState<string | null>(null);
   const [monthsByUser, setMonthsByUser] = useState<Record<string, string>>({});
+  const [toolAccessByUser, setToolAccessByUser] = useState<Record<string, ToolFlags>>({});
+  const [premiumToolsByUser, setPremiumToolsByUser] = useState<Record<string, ToolFlags>>({});
 
   const [searchField, setSearchField] = useState<AdminSearchField>('all');
   const [searchInput, setSearchInput] = useState('');
@@ -88,6 +93,18 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
     return source.slice(0, 2).toUpperCase();
   };
 
+  const summarizeTools = (flags: ToolFlags) => {
+    const selected = PLATFORM_TOOLS.filter((tool) => flags[tool.id]);
+    if (selected.length === PLATFORM_TOOLS.length) return 'Todas';
+    if (selected.length === 0) return 'Ninguna';
+    return selected.map((tool) => tool.label).join(', ');
+  };
+
+  const toggleToolFlag = (flags: ToolFlags, toolId: ToolId): ToolFlags => ({
+    ...flags,
+    [toolId]: !flags[toolId],
+  });
+
   const updateRowFromResult = (targetEmail: string, result: ManageUserAccessResult) => {
     setUsers((previous) =>
       previous.map((item) => {
@@ -108,9 +125,20 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
             result.premium
               ? result.premiumGrantedAt || item.premiumGrantedAt || new Date().toISOString()
               : null,
+          toolAccess: normalizeToolFlags(result.toolAccess, true),
+          premiumTools: normalizeToolFlags(result.premiumTools, true),
         };
       })
     );
+
+    setToolAccessByUser((previous) => ({
+      ...previous,
+      [result.uid]: normalizeToolFlags(result.toolAccess, true),
+    }));
+    setPremiumToolsByUser((previous) => ({
+      ...previous,
+      [result.uid]: normalizeToolFlags(result.premiumTools, true),
+    }));
   };
 
   const loadUsers = useCallback(
@@ -162,6 +190,20 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
           const next = { ...previous };
           data.users.forEach((item) => {
             if (next[item.uid] == null) next[item.uid] = '6';
+          });
+          return next;
+        });
+        setToolAccessByUser((previous) => {
+          const next = append ? { ...previous } : {};
+          data.users.forEach((item) => {
+            next[item.uid] = normalizeToolFlags(item.toolAccess, true);
+          });
+          return next;
+        });
+        setPremiumToolsByUser((previous) => {
+          const next = append ? { ...previous } : {};
+          data.users.forEach((item) => {
+            next[item.uid] = normalizeToolFlags(item.premiumTools, true);
           });
           return next;
         });
@@ -268,6 +310,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
         premium: newUserAccessMode !== 'none',
         unlimited: newUserAccessMode === 'vip',
         months: newUserAccessMode === 'months' ? months : undefined,
+        toolAccess: newUserToolAccess,
+        premiumTools: newUserPremiumTools,
       };
 
       const result = await manageUserAccess(apiBaseUrl, token, payload);
@@ -283,6 +327,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       setNewUserDisplayName('');
       setNewUserAccessMode('months');
       setNewUserMonthsInput('6');
+      setNewUserToolAccess(buildDefaultToolFlags(true));
+      setNewUserPremiumTools(buildDefaultToolFlags(true));
     } catch (err: any) {
       setError(err?.message || 'No se pudo crear/actualizar el usuario.');
     } finally {
@@ -292,7 +338,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
   const applyActionToUser = async (
     user: AdminListedUser,
-    payload: { premium: boolean; unlimited: boolean; months?: number },
+    payload: { premium?: boolean; unlimited?: boolean; months?: number; toolAccess?: ToolFlags; premiumTools?: ToolFlags },
     actionLabel: string
   ) => {
     if (!user.email) {
@@ -314,9 +360,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       const token = await currentUser.getIdToken(true);
       const result = await manageUserAccess(apiBaseUrl, token, {
         email: user.email,
-        premium: payload.premium,
-        unlimited: payload.unlimited,
-        months: payload.months,
+        ...payload,
       });
 
       updateRowFromResult(user.email, result);
@@ -326,6 +370,17 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
     } finally {
       setActiveActionKey(null);
     }
+  };
+
+  const applyToolSettingsToUser = async (user: AdminListedUser) => {
+    await applyActionToUser(
+      user,
+      {
+        toolAccess: toolAccessByUser[user.uid] || normalizeToolFlags(user.toolAccess, true),
+        premiumTools: premiumToolsByUser[user.uid] || normalizeToolFlags(user.premiumTools, true),
+      },
+      'tools'
+    );
   };
 
   return (
@@ -437,6 +492,50 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                 {isCreatingUser ? 'Guardando...' : 'Crear / actualizar usuario'}
               </button>
             </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                <p className="text-sm font-semibold text-slate-700">Acceso a herramientas</p>
+                <p className="text-xs text-slate-500 mt-1">Todas están activas por default.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {PLATFORM_TOOLS.map((tool) => (
+                    <label
+                      key={tool.id}
+                      className="inline-flex items-center gap-2 text-xs text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newUserToolAccess[tool.id]}
+                        onChange={() => setNewUserToolAccess((current) => toggleToolFlag(current, tool.id))}
+                        className="accent-indigo-600"
+                      />
+                      {tool.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                <p className="text-sm font-semibold text-slate-700">Premium por herramienta</p>
+                <p className="text-xs text-slate-500 mt-1">Aplica cuando el usuario tenga premium activo.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {PLATFORM_TOOLS.map((tool) => (
+                    <label
+                      key={tool.id}
+                      className="inline-flex items-center gap-2 text-xs text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newUserPremiumTools[tool.id]}
+                        onChange={() => setNewUserPremiumTools((current) => toggleToolFlag(current, tool.id))}
+                        className="accent-indigo-600"
+                      />
+                      {tool.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -499,15 +598,16 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="min-w-[1150px] w-full text-sm">
+              <table className="min-w-[1350px] w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-left text-slate-700">
                     <th className="px-4 py-3 font-semibold">Usuario</th>
                     <th className="px-4 py-3 font-semibold">Correo</th>
                     <th className="px-4 py-3 font-semibold">Estado premium</th>
+                    <th className="px-4 py-3 font-semibold">Herramientas</th>
                     <th className="px-4 py-3 font-semibold">Obtenido</th>
                     <th className="px-4 py-3 font-semibold">Vence</th>
-                    <th className="px-4 py-3 font-semibold w-[420px]">Acciones</th>
+                    <th className="px-4 py-3 font-semibold w-[520px]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -516,6 +616,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                     const months = Number(monthsInput);
                     const canApplyMonths = Number.isInteger(months) && months > 0;
                     const isBusy = activeActionKey?.startsWith(`${user.uid}:`) === true;
+                    const toolAccess = toolAccessByUser[user.uid] || normalizeToolFlags(user.toolAccess, true);
+                    const premiumTools = premiumToolsByUser[user.uid] || normalizeToolFlags(user.premiumTools, true);
 
                     const stateLabel = user.premiumActive
                       ? user.premiumUnlimited
@@ -566,10 +668,76 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                             {stateLabel}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 space-y-1">
+                          <p>
+                            <span className="font-semibold text-slate-700">Acceso:</span> {summarizeTools(toolAccess)}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-slate-700">Premium:</span> {summarizeTools(premiumTools)}
+                          </p>
+                        </td>
                         <td className="px-4 py-3 text-slate-700">{formatDate(user.premiumGrantedAt)}</td>
                         <td className="px-4 py-3 text-slate-700">{formatDate(user.premiumExpiresAt)}</td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="border border-slate-200 rounded-lg p-2">
+                                <p className="text-xs font-semibold text-slate-700 mb-2">Acceso</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PLATFORM_TOOLS.map((tool) => (
+                                    <label key={tool.id} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={toolAccess[tool.id]}
+                                        onChange={() =>
+                                          setToolAccessByUser((previous) => ({
+                                            ...previous,
+                                            [user.uid]: toggleToolFlag(toolAccess, tool.id),
+                                          }))
+                                        }
+                                        className="accent-indigo-600"
+                                      />
+                                      {tool.label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="border border-slate-200 rounded-lg p-2">
+                                <p className="text-xs font-semibold text-slate-700 mb-2">Premium</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PLATFORM_TOOLS.map((tool) => (
+                                    <label key={tool.id} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={premiumTools[tool.id]}
+                                        onChange={() =>
+                                          setPremiumToolsByUser((previous) => ({
+                                            ...previous,
+                                            [user.uid]: toggleToolFlag(premiumTools, tool.id),
+                                          }))
+                                        }
+                                        className="accent-indigo-600"
+                                      />
+                                      {tool.label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={!user.email || isBusy}
+                                onClick={() => applyToolSettingsToUser(user)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                              >
+                                Guardar herramientas
+                              </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
                             <input
                               type="number"
                               min={1}
@@ -584,7 +752,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                               onClick={() =>
                                 applyActionToUser(
                                   user,
-                                  { premium: true, unlimited: false, months },
+                                  { premium: true, unlimited: false, months, toolAccess, premiumTools },
                                   'months'
                                 )
                               }
@@ -598,7 +766,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                               onClick={() =>
                                 applyActionToUser(
                                   user,
-                                  { premium: true, unlimited: true },
+                                  { premium: true, unlimited: true, toolAccess, premiumTools },
                                   'vip'
                                 )
                               }
@@ -612,7 +780,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                               onClick={() =>
                                 applyActionToUser(
                                   user,
-                                  { premium: false, unlimited: false },
+                                  { premium: false, unlimited: false, toolAccess, premiumTools },
                                   'remove'
                                 )
                               }
@@ -620,6 +788,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                             >
                               Quitar premium
                             </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -628,7 +797,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                      <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                         {hasActiveFilters
                           ? 'No se encontraron usuarios con ese filtro.'
                           : 'No hay usuarios para mostrar.'}

@@ -3,6 +3,7 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { buildDefaultToolFlags, normalizeToolFlags } = require('./_tools.js');
 
 const getFirebaseApp = () => {
   if (getApps().length > 0) return getApps()[0];
@@ -76,6 +77,8 @@ const registerUserIfNew = async (uid) => {
       premiumExpiresAt: null,
       premiumGrantedAt: null,
       premiumSource: null,
+      toolAccess: buildDefaultToolFlags(true),
+      premiumTools: buildDefaultToolFlags(true),
       lastStripeSessionId: null,
       payments: [],
       createdAt: now,
@@ -147,6 +150,7 @@ const syncUserToFirestore = async (uid, userRecord, session, source) => {
     premiumGrantedAt: now,
     premiumExpiresAt: newExpirationTimestamp,
     premiumSource: source,
+    premiumTools: buildDefaultToolFlags(true),
     email: userRecord.email || null,
     displayName: userRecord.displayName || null,
     updatedAt: now,
@@ -201,6 +205,8 @@ const grantPremiumAccessFromSession = async (session, source) => {
     premiumSessionId: session.id,
     premiumUpdatedAt: Date.now(),
     premiumExpiresAt: expiresAt ? expiresAt.toMillis() : null,
+    toolAccess: normalizeToolFlags(existingClaims.toolAccess, true),
+    premiumTools: buildDefaultToolFlags(true),
   });
 
   console.log(`[firebase] premium=true set for uid ${firebaseUid}`);

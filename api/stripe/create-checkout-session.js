@@ -4,6 +4,7 @@ const Stripe = require('stripe');
 const { verifyFirebaseToken } = require('../_firebase.js');
 const { getApps } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
+const { isToolEnabled } = require('../_tools.js');
 
 const normalizeReturnPath = (value) => {
   if (typeof value !== 'string') return '/';
@@ -46,7 +47,10 @@ module.exports = async function handler(req, res) {
   try {
     const app = getApps()[0];
     const userRecord = await getAuth(app).getUser(decodedToken.uid);
-    if (userRecord.customClaims?.premium === true) {
+    if (
+      userRecord.customClaims?.premium === true &&
+      isToolEnabled(userRecord.customClaims?.premiumTools, 'gage-rr', true)
+    ) {
       res.json({ alreadyPaid: true });
       return;
     }

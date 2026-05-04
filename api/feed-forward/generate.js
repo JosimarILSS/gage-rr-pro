@@ -1,6 +1,8 @@
 'use strict';
 
-const { verifyFirebaseToken } = require('../_firebase.js');
+const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
+const { getFirestore } = require('firebase-admin/firestore');
+const { isToolEnabled } = require('../_tools.js');
 
 const MAX_NAME_LENGTH = 120;
 const MAX_DIRECTIVES_LENGTH = 4000;
@@ -171,6 +173,20 @@ module.exports = async function handler(req, res) {
 
   const decodedToken = await verifyFirebaseToken(req, res);
   if (!decodedToken) return;
+
+  try {
+    const app = getFirebaseApp();
+    const profileSnap = await getFirestore(app).collection('usuarios').doc(decodedToken.uid).get();
+    const profile = profileSnap.exists ? profileSnap.data() : {};
+    if (!isToolEnabled(profile.toolAccess, 'feed-forward', true)) {
+      res.status(403).json({ error: 'No tienes acceso a esta herramienta.' });
+      return;
+    }
+  } catch (error) {
+    console.error('[feed-forward] Access check failed:', error.message);
+    res.status(500).json({ error: 'Could not verify tool access.' });
+    return;
+  }
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) {

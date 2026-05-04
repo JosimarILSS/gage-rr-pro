@@ -16,6 +16,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { UserAccountProfile } from '../services/auth';
+import { isToolEnabled, type ToolFlags, type ToolId } from '../config/tools';
 import type { Lang } from '../types/common';
 
 type ToolsPageProps = {
@@ -34,6 +35,7 @@ type ToolsPageProps = {
   onOpenGageRR: () => void;
   onOpenSixSigma: () => void;
   onOpenFeedForward: () => void;
+  toolAccess?: ToolFlags;
   showAdminAccessButton?: boolean;
   onGoToAdminAccess?: () => void;
 };
@@ -78,6 +80,7 @@ export default function ToolsPage({
   onOpenGageRR,
   onOpenSixSigma,
   onOpenFeedForward,
+  toolAccess,
   showAdminAccessButton = false,
   onGoToAdminAccess,
 }: ToolsPageProps) {
@@ -97,6 +100,7 @@ export default function ToolsPage({
       feedForwardDescription:
         'Convierte observaciones de desempeño en una sesión de retroalimentación estructurada y lista para entregar.',
       openTool: 'Abrir herramienta',
+      noAccess: 'Sin acceso',
       profileTitle: 'Mi perfil',
       account: 'Cuenta',
       accountData: 'Datos de cuenta',
@@ -143,6 +147,7 @@ export default function ToolsPage({
       feedForwardDescription:
         'Turn performance observations into a structured feedback session ready to deliver.',
       openTool: 'Open tool',
+      noAccess: 'No access',
       profileTitle: 'My profile',
       account: 'Account',
       accountData: 'Account data',
@@ -179,8 +184,12 @@ export default function ToolsPage({
   const email = accountProfile?.email || userEmail || copy.noEmail;
   const displayName = accountProfile?.displayName || userDisplayName || copy.noName;
   const photoURL = accountProfile?.photoURL || userPhotoURL || null;
-  const isPremiumActive = accountProfile?.premiumActive ?? esPremium;
-  const hadPremium = accountProfile?.premium === true;
+  const isPremiumActive =
+    accountProfile
+      ? accountProfile.premiumActive && isToolEnabled(accountProfile.premiumTools, 'gage-rr', true)
+      : esPremium;
+  const hadPremium =
+    accountProfile?.premium === true && isToolEnabled(accountProfile.premiumTools, 'gage-rr', true);
   const premiumExpiresAt = formatDate(accountProfile?.premiumExpiresAt, lang);
   const premiumGrantedAt = formatDate(accountProfile?.premiumGrantedAt, lang);
   const createdAt = formatDate(accountProfile?.createdAt, lang);
@@ -194,6 +203,17 @@ export default function ToolsPage({
     : hadPremium
       ? 'app-badge-warning'
       : '';
+  const canOpenTool = (toolId: ToolId) => isToolEnabled(toolAccess, toolId, true);
+  const getToolCardClass = (toolId: ToolId) =>
+    `group min-h-[220px] text-left app-card p-5 flex flex-col ${
+      canOpenTool(toolId)
+        ? 'app-card-hover cursor-pointer'
+        : 'opacity-60 cursor-not-allowed'
+    }`;
+  const handleToolOpen = (toolId: ToolId, callback: () => void) => {
+    if (!canOpenTool(toolId)) return;
+    callback();
+  };
 
   return (
     <div className="app-shell">
@@ -242,15 +262,16 @@ export default function ToolsPage({
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <button
               type="button"
-              onClick={onOpenGageRR}
-              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
+              onClick={() => handleToolOpen('gage-rr', onOpenGageRR)}
+              disabled={!canOpenTool('gage-rr')}
+              className={getToolCardClass('gage-rr')}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="app-icon-tile app-icon-tile-lg">
                   <BarChart3 className="w-6 h-6" />
                 </div>
-                <span className="app-badge app-badge-success">
-                  {copy.toolStatus}
+                <span className={`app-badge ${canOpenTool('gage-rr') ? 'app-badge-success' : 'app-badge-danger'}`}>
+                  {canOpenTool('gage-rr') ? copy.toolStatus : copy.noAccess}
                 </span>
               </div>
 
@@ -267,15 +288,16 @@ export default function ToolsPage({
 
             <button
               type="button"
-              onClick={onOpenSixSigma}
-              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
+              onClick={() => handleToolOpen('six-sigma', onOpenSixSigma)}
+              disabled={!canOpenTool('six-sigma')}
+              className={getToolCardClass('six-sigma')}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="app-icon-tile app-icon-tile-lg app-icon-tile-success">
                   <TrendingUp className="w-6 h-6" />
                 </div>
-                <span className="app-badge app-badge-success">
-                  {copy.toolStatus}
+                <span className={`app-badge ${canOpenTool('six-sigma') ? 'app-badge-success' : 'app-badge-danger'}`}>
+                  {canOpenTool('six-sigma') ? copy.toolStatus : copy.noAccess}
                 </span>
               </div>
 
@@ -292,15 +314,16 @@ export default function ToolsPage({
 
             <button
               type="button"
-              onClick={onOpenFeedForward}
-              className="group min-h-[220px] text-left app-card app-card-hover p-5 cursor-pointer flex flex-col"
+              onClick={() => handleToolOpen('feed-forward', onOpenFeedForward)}
+              disabled={!canOpenTool('feed-forward')}
+              className={getToolCardClass('feed-forward')}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="app-icon-tile app-icon-tile-lg app-icon-tile-warning">
                   <MessageSquare className="w-6 h-6" />
                 </div>
-                <span className="app-badge app-badge-success">
-                  {copy.toolStatus}
+                <span className={`app-badge ${canOpenTool('feed-forward') ? 'app-badge-success' : 'app-badge-danger'}`}>
+                  {canOpenTool('feed-forward') ? copy.toolStatus : copy.noAccess}
                 </span>
               </div>
 

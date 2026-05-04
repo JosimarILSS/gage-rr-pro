@@ -9,6 +9,7 @@ import SixSigmaPage from './pages/SixSigmaPage';
 import FeedForwardPage from './pages/FeedForwardPage';
 import AdminAccessGatePage from './pages/AdminAccessGatePage';
 import AdminUserAccessPage from './pages/AdminUserAccessPage';
+import { isToolEnabled } from './config/tools';
 import type { Lang } from './types/common';
 
 const ADMIN_ROUTE = '/admin_user_access';
@@ -41,6 +42,13 @@ export default function App() {
   const loggedEmail = (authSession.user?.email || '').toLowerCase();
   const canSeeAdminEntry =
     allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
+  const hasGageRRAccess = isToolEnabled(authSession.accountProfile?.toolAccess, 'gage-rr', true);
+  const hasSixSigmaAccess = isToolEnabled(authSession.accountProfile?.toolAccess, 'six-sigma', true);
+  const hasFeedForwardAccess = isToolEnabled(authSession.accountProfile?.toolAccess, 'feed-forward', true);
+  const hasBlockedToolRoute =
+    (isGageRRToolRoute && !hasGageRRAccess) ||
+    (isSixSigmaToolRoute && !hasSixSigmaAccess) ||
+    (isFeedForwardToolRoute && !hasFeedForwardAccess);
 
   const navigateTo = (path: string, replace = false) => {
     if (replace) {
@@ -73,6 +81,11 @@ export default function App() {
 
     navigateTo(TOOLS_ROUTE, true);
   }, [isAdminRoute, authSession.loadingAuth, authSession.user, isAuthorizedAdminUser]);
+
+  useEffect(() => {
+    if (!hasBlockedToolRoute) return;
+    navigateTo(TOOLS_ROUTE, true);
+  }, [hasBlockedToolRoute]);
 
   if (authSession.loadingAuth) {
     return <LoadingPage />;
@@ -118,7 +131,7 @@ export default function App() {
     );
   }
 
-  if (isGageRRToolRoute) {
+  if (isGageRRToolRoute && hasGageRRAccess) {
     return (
       <AnalysisPage
         lang={lang}
@@ -137,7 +150,7 @@ export default function App() {
     );
   }
 
-  if (isSixSigmaToolRoute) {
+  if (isSixSigmaToolRoute && hasSixSigmaAccess) {
     return (
       <SixSigmaPage
         lang={lang}
@@ -147,7 +160,7 @@ export default function App() {
     );
   }
 
-  if (isFeedForwardToolRoute) {
+  if (isFeedForwardToolRoute && hasFeedForwardAccess) {
     return (
       <FeedForwardPage
         lang={lang}
@@ -175,6 +188,7 @@ export default function App() {
       onOpenGageRR={() => navigateTo(GAGE_RR_TOOL_ROUTE)}
       onOpenSixSigma={() => navigateTo(SIX_SIGMA_TOOL_ROUTE)}
       onOpenFeedForward={() => navigateTo(FEED_FORWARD_TOOL_ROUTE)}
+      toolAccess={authSession.accountProfile?.toolAccess}
       showAdminAccessButton={canSeeAdminEntry}
       onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
     />

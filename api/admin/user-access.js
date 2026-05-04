@@ -3,6 +3,7 @@
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldPath, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
+const { normalizeToolFlags } = require('../_tools.js');
 
 const parseAllowedAdminEmails = (rawValue) =>
   (rawValue || '')
@@ -99,6 +100,8 @@ const mapUserFromProfileDoc = (docSnap, nowMs) => {
   const premiumGrantedAtDate = toDateOrNull(profile.premiumGrantedAt);
   const premiumUnlimited = premium && !premiumExpiresAtDate;
   const premiumActive = premium && (premiumUnlimited || premiumExpiresAtDate.getTime() > nowMs);
+  const toolAccess = normalizeToolFlags(profile.toolAccess, true);
+  const premiumTools = normalizeToolFlags(profile.premiumTools, true);
 
   return {
     uid: docSnap.id,
@@ -110,6 +113,8 @@ const mapUserFromProfileDoc = (docSnap, nowMs) => {
     premiumUnlimited,
     premiumGrantedAt: toIsoOrNull(premiumGrantedAtDate),
     premiumExpiresAt: toIsoOrNull(premiumExpiresAtDate),
+    toolAccess,
+    premiumTools,
     createdAt: toIsoOrNull(profile.createdAt),
     lastSignInAt: toIsoOrNull(profile.lastSignInAt),
   };
@@ -213,13 +218,18 @@ module.exports = async function handler(req, res) {
   const premiumRaw = req.body?.premium;
   const unlimitedRaw = req.body?.unlimited;
   const monthsRaw = req.body?.months;
+  const hasPremiumChange = typeof premiumRaw === 'boolean';
+  const hasToolAccessInput = req.body && typeof req.body.toolAccess === 'object' && req.body.toolAccess !== null;
+  const hasPremiumToolsInput = req.body && typeof req.body.premiumTools === 'object' && req.body.premiumTools !== null;
 
   const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
   const displayName = typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
   const hasDisplayName = displayName.length > 0;
-  const premium = typeof premiumRaw === 'boolean' ? premiumRaw : null;
+  const premium = hasPremiumChange ? premiumRaw : null;
   const unlimited = unlimitedRaw === true;
   const months = monthsRaw == null || monthsRaw === '' ? 6 : Number(monthsRaw);
+  const toolAccessInput = normalizeToolFlags(req.body?.toolAccess, true);
+  const premiumToolsInput = normalizeToolFlags(req.body?.premiumTools, true);
 
   if (!email || !isValidEmail(email)) {
     res.status(400).json({ error: 'Invalid email.' });
@@ -231,17 +241,17 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (premium === null) {
-    res.status(400).json({ error: 'premium must be true or false.' });
+  if (!hasPremiumChange && !hasToolAccessInput && !hasPremiumToolsInput && !hasDisplayName) {
+    res.status(400).json({ error: 'No changes were provided.' });
     return;
   }
 
-  if (!premium && unlimited) {
+  if (premium === false && unlimited) {
     res.status(400).json({ error: 'unlimited only applies when premium is true.' });
     return;
   }
 
-  if (premium && !unlimited && (!Number.isInteger(months) || months <= 0)) {
+  if (premium === true && !unlimited && (!Number.isInteger(months) || months <= 0)) {
     res.status(400).json({ error: 'months must be a positive integer.' });
     return;
   }
@@ -270,33 +280,54 @@ module.exports = async function handler(req, res) {
 
     const userRef = db.collection('usuarios').doc(uid);
     const snap = await userRef.get();
+    const existingData = snap.exists ? snap.data() : {};
     const now = new Date();
+    const currentPremium = typeof existingData.premium === 'boolean' ? existingData.premium : false;
+    const currentPremiumExpiresAt = snap.exists ? toDateOrNull(existingData.premiumExpiresAt) : null;
+    const currentPremiumUnlimited = currentPremium && !currentPremiumExpiresAt;
+    const nextPremium = hasPremiumChange ? premium : currentPremium;
+    const nextUnlimited = hasPremiumChange ? unlimited : currentPremiumUnlimited;
+    const nextToolAccess = hasToolAccessInput
+      ? toolAccessInput
+      : normalizeToolFlags(existingData.toolAccess, true);
+    const nextPremiumTools = hasPremiumToolsInput
+      ? premiumToolsInput
+      : normalizeToolFlags(existingData.premiumTools, true);
 
     let premiumExpiresAt = null;
     let premiumExpiresAtTimestamp = null;
+    let premiumGrantedAtForResponse = null;
 
-    if (premium) {
-      if (unlimited) {
+    if (nextPremium) {
+      if (nextUnlimited) {
         premiumExpiresAt = null;
         premiumExpiresAtTimestamp = null;
-      } else {
-        const currentExpiration = snap.exists ? toDateOrNull(snap.data().premiumExpiresAt) : null;
+        premiumGrantedAtForResponse = now;
+      } else if (hasPremiumChange) {
+        const currentExpiration = currentPremiumExpiresAt;
         const baseDate =
           currentExpiration && currentExpiration.getTime() > now.getTime()
             ? currentExpiration
             : now;
         premiumExpiresAt = addMonths(baseDate, months);
         premiumExpiresAtTimestamp = Timestamp.fromDate(premiumExpiresAt);
+        premiumGrantedAtForResponse = now;
+      } else {
+        premiumExpiresAt = currentPremiumExpiresAt;
+        premiumExpiresAtTimestamp = premiumExpiresAt ? Timestamp.fromDate(premiumExpiresAt) : null;
+        premiumGrantedAtForResponse = toDateOrNull(existingData.premiumGrantedAt);
       }
     }
 
     const existingClaims = userRecord.customClaims || {};
     await auth.setCustomUserClaims(uid, {
       ...existingClaims,
-      premium,
-      premiumSource: premium ? 'manual' : null,
+      premium: nextPremium,
+      premiumSource: nextPremium ? 'manual' : null,
       premiumUpdatedAt: Date.now(),
       premiumExpiresAt: premiumExpiresAtTimestamp ? premiumExpiresAtTimestamp.toMillis() : null,
+      toolAccess: nextToolAccess,
+      premiumTools: nextPremiumTools,
     });
 
     const serverNow = FieldValue.serverTimestamp();
@@ -306,10 +337,12 @@ module.exports = async function handler(req, res) {
         email: userRecord.email || null,
         displayName: hasDisplayName ? displayName : userRecord.displayName || null,
         photoURL: userRecord.photoURL || null,
-        premium,
+        premium: nextPremium,
         premiumExpiresAt: premiumExpiresAtTimestamp,
-        premiumGrantedAt: premium ? serverNow : null,
-        premiumSource: premium ? 'manual' : null,
+        premiumGrantedAt: nextPremium ? serverNow : null,
+        premiumSource: nextPremium ? 'manual' : null,
+        toolAccess: nextToolAccess,
+        premiumTools: nextPremiumTools,
         lastStripeSessionId: null,
         payments: [],
         createdAt: serverNow,
@@ -317,18 +350,20 @@ module.exports = async function handler(req, res) {
       });
     } else {
       const update = {
-        premium,
+        premium: nextPremium,
         premiumExpiresAt: premiumExpiresAtTimestamp,
-        premiumSource: premium ? (snap.data().premiumSource || 'manual') : null,
+        premiumSource: nextPremium ? (existingData.premiumSource || 'manual') : null,
+        toolAccess: nextToolAccess,
+        premiumTools: nextPremiumTools,
         updatedAt: serverNow,
       };
       if (hasDisplayName) {
         update.displayName = displayName;
       }
-      if (premium && !snap.data().premiumGrantedAt) {
+      if (nextPremium && (hasPremiumChange || !existingData.premiumGrantedAt)) {
         update.premiumGrantedAt = serverNow;
       }
-      if (!premium) {
+      if (!nextPremium) {
         update.premiumGrantedAt = null;
       }
       await userRef.update(update);
@@ -340,11 +375,15 @@ module.exports = async function handler(req, res) {
       email,
       displayName: hasDisplayName ? displayName : userRecord.displayName || null,
       created,
-      premium,
-      unlimited: premium ? unlimited : false,
-      monthsApplied: premium && !unlimited ? months : null,
+      premium: nextPremium,
+      unlimited: nextPremium ? nextUnlimited : false,
+      monthsApplied: hasPremiumChange && nextPremium && !nextUnlimited ? months : null,
       expiresAt: premiumExpiresAt ? premiumExpiresAt.toISOString() : null,
-      premiumGrantedAt: premium ? now.toISOString() : null,
+      premiumGrantedAt: nextPremium
+        ? (premiumGrantedAtForResponse ? premiumGrantedAtForResponse.toISOString() : now.toISOString())
+        : null,
+      toolAccess: nextToolAccess,
+      premiumTools: nextPremiumTools,
     });
   } catch (error) {
     console.error('[admin-user-access] Failed:', error.message);
