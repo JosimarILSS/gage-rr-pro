@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Home, LogOut, RefreshCw, Search, ShieldCheck, UserPlus } from 'lucide-react';
+import { CalendarClock, Home, KeyRound, LogOut, RefreshCw, Save, Search, ShieldCheck, UserPlus } from 'lucide-react';
 import {
   listAdminUsers,
   manageUserAccess,
+  type AdminPremiumMonthAction,
   type AdminListedUser,
   type AdminPremiumStatusFilter,
   type AdminSearchField,
   type ListAdminUsersParams,
+  type ManageUserAccessPayload,
   type ManageUserAccessResult,
 } from '../services/admin-user';
 import { auth } from '../firebase';
@@ -304,12 +306,13 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
       }
 
       const token = await currentUser.getIdToken(true);
-      const payload = {
+      const payload: ManageUserAccessPayload = {
         email: normalizedEmail,
         displayName: normalizedDisplayName || undefined,
         premium: newUserAccessMode !== 'none',
         unlimited: newUserAccessMode === 'vip',
         months: newUserAccessMode === 'months' ? months : undefined,
+        monthAction: newUserAccessMode === 'months' ? 'set' : undefined,
         toolAccess: newUserToolAccess,
         premiumTools: newUserPremiumTools,
       };
@@ -338,7 +341,14 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
 
   const applyActionToUser = async (
     user: AdminListedUser,
-    payload: { premium?: boolean; unlimited?: boolean; months?: number; toolAccess?: ToolFlags; premiumTools?: ToolFlags },
+    payload: {
+      premium?: boolean;
+      unlimited?: boolean;
+      months?: number;
+      monthAction?: AdminPremiumMonthAction;
+      toolAccess?: ToolFlags;
+      premiumTools?: ToolFlags;
+    },
     actionLabel: string
   ) => {
     if (!user.email) {
@@ -392,7 +402,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
               <ShieldCheck className="w-4 h-4" />
               Acceso administrativo restringido
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 mt-3">Admin User Access</h1>
+            <h1 className="text-2xl font-bold text-slate-800 mt-3">Administración de usuarios</h1>
             <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
           </div>
           <div className="flex items-center gap-4">
@@ -423,117 +433,149 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-base font-semibold text-slate-800">Agregar nuevo usuario</h2>
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
+          <div className="border border-slate-200 rounded-2xl bg-slate-50">
+            <div className="p-5 border-b border-slate-200 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-base font-semibold text-slate-800">Crear o actualizar usuario</h2>
+              </div>
+              <p className="text-sm text-slate-500">
+                Define primero los datos, permisos y premium. Después guarda los cambios para ese usuario.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-sm text-slate-600">Correo</span>
-                <input
-                  type="email"
-                  value={newUserEmail}
-                  onChange={(event) => setNewUserEmail(event.target.value)}
-                  placeholder="usuario@dominio.com"
-                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-sm text-slate-600">Nombre (opcional)</span>
-                <input
-                  type="text"
-                  value={newUserDisplayName}
-                  onChange={(event) => setNewUserDisplayName(event.target.value)}
-                  placeholder="Nombre del usuario"
-                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-[220px_200px_auto] gap-3 items-end">
-              <label className="flex flex-col gap-1">
-                <span className="text-sm text-slate-600">Tipo de acceso</span>
-                <select
-                  value={newUserAccessMode}
-                  onChange={(event) =>
-                    setNewUserAccessMode(event.target.value as 'months' | 'vip' | 'none')
-                  }
-                  className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
-                  <option value="months">Premium por meses</option>
-                  <option value="vip">Premium ilimitado (VIP)</option>
-                  <option value="none">Sin premium</option>
-                </select>
-              </label>
-
-              {newUserAccessMode === 'months' && (
-                <label className="flex flex-col gap-1">
-                  <span className="text-sm text-slate-600">Meses</span>
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-slate-600">Correo</span>
                   <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={newUserMonthsInput}
-                    onChange={(event) => handleNewUserMonthsChange(event.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(event) => setNewUserEmail(event.target.value)}
+                    placeholder="usuario@dominio.com"
+                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
                 </label>
-              )}
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-slate-600">Nombre visible (opcional)</span>
+                  <input
+                    type="text"
+                    value={newUserDisplayName}
+                    onChange={(event) => setNewUserDisplayName(event.target.value)}
+                    placeholder="Nombre del usuario"
+                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                </label>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleCreateUser}
-                disabled={isCreatingUser}
-                className="inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-              >
-                {isCreatingUser ? 'Guardando...' : 'Crear / actualizar usuario'}
-              </button>
-            </div>
+              <div className="grid grid-cols-1 lg:grid-cols-[260px_220px_minmax(0,1fr)] gap-4 items-start">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-slate-600">Estado premium inicial</span>
+                  <select
+                    value={newUserAccessMode}
+                    onChange={(event) =>
+                      setNewUserAccessMode(event.target.value as 'months' | 'vip' | 'none')
+                    }
+                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  >
+                    <option value="months">Premium con vencimiento</option>
+                    <option value="vip">VIP ilimitado</option>
+                    <option value="none">Sin premium</option>
+                  </select>
+                </label>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="border border-slate-200 rounded-xl p-3 bg-white">
-                <p className="text-sm font-semibold text-slate-700">Acceso a herramientas</p>
-                <p className="text-xs text-slate-500 mt-1">Todas están activas por default.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {PLATFORM_TOOLS.map((tool) => (
-                    <label
-                      key={tool.id}
-                      className="inline-flex items-center gap-2 text-xs text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newUserToolAccess[tool.id]}
-                        onChange={() => setNewUserToolAccess((current) => toggleToolFlag(current, tool.id))}
-                        className="accent-indigo-600"
-                      />
-                      {tool.label}
-                    </label>
-                  ))}
+                {newUserAccessMode === 'months' && (
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-slate-600">Meses desde hoy</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={newUserMonthsInput}
+                      onChange={(event) => handleNewUserMonthsChange(event.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </label>
+                )}
+
+                <div className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
+                  Al crear o actualizar con premium por meses, la vigencia se ajusta exactamente desde hoy.
+                  Si eliges "Sin premium", los permisos de herramientas se conservan para cuando se active.
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl p-3 bg-white">
-                <p className="text-sm font-semibold text-slate-700">Premium por herramienta</p>
-                <p className="text-xs text-slate-500 mt-1">Aplica cuando el usuario tenga premium activo.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {PLATFORM_TOOLS.map((tool) => (
-                    <label
-                      key={tool.id}
-                      className="inline-flex items-center gap-2 text-xs text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newUserPremiumTools[tool.id]}
-                        onChange={() => setNewUserPremiumTools((current) => toggleToolFlag(current, tool.id))}
-                        className="accent-indigo-600"
-                      />
-                      {tool.label}
-                    </label>
-                  ))}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="border border-slate-200 rounded-xl p-4 bg-white">
+                  <div className="flex items-start gap-2">
+                    <KeyRound className="w-4 h-4 text-indigo-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Herramientas disponibles</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Controla qué herramientas puede abrir. Todas vienen activas por default.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {PLATFORM_TOOLS.map((tool) => (
+                      <label
+                        key={tool.id}
+                        className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newUserToolAccess[tool.id]}
+                          onChange={() => setNewUserToolAccess((current) => toggleToolFlag(current, tool.id))}
+                          className="accent-indigo-600"
+                        />
+                        {tool.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="border border-slate-200 rounded-xl p-4 bg-white">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Beneficio premium por herramienta</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Solo aplica si el usuario tiene premium activo. Todas vienen seleccionadas por default.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {PLATFORM_TOOLS.map((tool) => (
+                      <label
+                        key={tool.id}
+                        className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newUserPremiumTools[tool.id]}
+                          onChange={() => setNewUserPremiumTools((current) => toggleToolFlag(current, tool.id))}
+                          className="accent-indigo-600"
+                        />
+                        {tool.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Úsalo también para actualizar permisos o premium de un usuario que ya existe.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCreateUser}
+                  disabled={isCreatingUser}
+                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  {isCreatingUser ? 'Guardando...' : 'Crear / actualizar usuario'}
+                </button>
               </div>
             </div>
           </div>
@@ -598,7 +640,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="min-w-[1350px] w-full text-sm">
+              <table className="min-w-[1580px] w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-left text-slate-700">
                     <th className="px-4 py-3 font-semibold">Usuario</th>
@@ -607,7 +649,7 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                     <th className="px-4 py-3 font-semibold">Herramientas</th>
                     <th className="px-4 py-3 font-semibold">Obtenido</th>
                     <th className="px-4 py-3 font-semibold">Vence</th>
-                    <th className="px-4 py-3 font-semibold w-[520px]">Acciones</th>
+                    <th className="px-4 py-3 font-semibold w-[660px]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -680,114 +722,200 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
                         <td className="px-4 py-3 text-slate-700">{formatDate(user.premiumExpiresAt)}</td>
                         <td className="px-4 py-3">
                           <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div className="border border-slate-200 rounded-lg p-2">
-                                <p className="text-xs font-semibold text-slate-700 mb-2">Acceso</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {PLATFORM_TOOLS.map((tool) => (
-                                    <label key={tool.id} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                                      <input
-                                        type="checkbox"
-                                        checked={toolAccess[tool.id]}
-                                        onChange={() =>
-                                          setToolAccessByUser((previous) => ({
-                                            ...previous,
-                                            [user.uid]: toggleToolFlag(toolAccess, tool.id),
-                                          }))
-                                        }
-                                        className="accent-indigo-600"
-                                      />
-                                      {tool.label}
-                                    </label>
-                                  ))}
+                            <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-800">Permisos por herramienta</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    Acceso permite abrir la herramienta; Premium limita beneficios dentro de cada una.
+                                  </p>
                                 </div>
+                                <button
+                                  type="button"
+                                  disabled={!user.email || isBusy}
+                                  onClick={() => applyToolSettingsToUser(user)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                  Guardar permisos
+                                </button>
                               </div>
 
-                              <div className="border border-slate-200 rounded-lg p-2">
-                                <p className="text-xs font-semibold text-slate-700 mb-2">Premium</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {PLATFORM_TOOLS.map((tool) => (
-                                    <label key={tool.id} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                                      <input
-                                        type="checkbox"
-                                        checked={premiumTools[tool.id]}
-                                        onChange={() =>
-                                          setPremiumToolsByUser((previous) => ({
-                                            ...previous,
-                                            [user.uid]: toggleToolFlag(premiumTools, tool.id),
-                                          }))
-                                        }
-                                        className="accent-indigo-600"
-                                      />
-                                      {tool.label}
-                                    </label>
-                                  ))}
+                              <div className="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                  <p className="text-xs font-semibold text-slate-700 mb-2">Herramientas disponibles</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {PLATFORM_TOOLS.map((tool) => (
+                                      <label
+                                        key={tool.id}
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={toolAccess[tool.id]}
+                                          onChange={() =>
+                                            setToolAccessByUser((previous) => ({
+                                              ...previous,
+                                              [user.uid]: toggleToolFlag(toolAccess, tool.id),
+                                            }))
+                                          }
+                                          className="accent-indigo-600"
+                                        />
+                                        {tool.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                                  <p className="text-xs font-semibold text-slate-700 mb-2">Beneficio premium</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {PLATFORM_TOOLS.map((tool) => (
+                                      <label
+                                        key={tool.id}
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={premiumTools[tool.id]}
+                                          onChange={() =>
+                                            setPremiumToolsByUser((previous) => ({
+                                              ...previous,
+                                              [user.uid]: toggleToolFlag(premiumTools, tool.id),
+                                            }))
+                                          }
+                                          className="accent-indigo-600"
+                                        />
+                                        {tool.label}
+                                      </label>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                disabled={!user.email || isBusy}
-                                onClick={() => applyToolSettingsToUser(user)}
-                                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                              >
-                                Guardar herramientas
-                              </button>
-                            </div>
+                            <div className="border border-indigo-100 rounded-xl p-3 bg-indigo-50/40">
+                              <div className="flex items-start gap-2">
+                                <CalendarClock className="w-4 h-4 text-indigo-700 mt-0.5" />
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-800">Vigencia premium</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    Agregar extiende desde el vencimiento actual. Quitar descuenta del vencimiento actual.
+                                    Ajustar reinicia la vigencia desde hoy.
+                                  </p>
+                                </div>
+                              </div>
 
-                            <div className="flex flex-wrap gap-2">
-                            <input
-                              type="number"
-                              min={1}
-                              step={1}
-                              value={monthsInput}
-                              onChange={(event) => handleMonthsChange(user.uid, event.target.value)}
-                              className="w-24 border border-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                            />
-                            <button
-                              type="button"
-                              disabled={!user.email || isBusy || !canApplyMonths}
-                              onClick={() =>
-                                applyActionToUser(
-                                  user,
-                                  { premium: true, unlimited: false, months, toolAccess, premiumTools },
-                                  'months'
-                                )
-                              }
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                            >
-                              Dar meses
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!user.email || isBusy}
-                              onClick={() =>
-                                applyActionToUser(
-                                  user,
-                                  { premium: true, unlimited: true, toolAccess, premiumTools },
-                                  'vip'
-                                )
-                              }
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                            >
-                              VIP ilimitado
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!user.email || isBusy}
-                              onClick={() =>
-                                applyActionToUser(
-                                  user,
-                                  { premium: false, unlimited: false, toolAccess, premiumTools },
-                                  'remove'
-                                )
-                              }
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                            >
-                              Quitar premium
-                            </button>
+                              <div className="mt-3 grid grid-cols-1 lg:grid-cols-[120px_minmax(0,1fr)] gap-3">
+                                <label className="flex flex-col gap-1">
+                                  <span className="text-xs font-semibold text-slate-600">Meses</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={monthsInput}
+                                    onChange={(event) => handleMonthsChange(user.uid, event.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                  />
+                                </label>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={!user.email || isBusy || !canApplyMonths}
+                                    onClick={() =>
+                                      applyActionToUser(
+                                        user,
+                                        {
+                                          premium: true,
+                                          unlimited: false,
+                                          months,
+                                          monthAction: 'add',
+                                          toolAccess,
+                                          premiumTools,
+                                        },
+                                        'add-months'
+                                      )
+                                    }
+                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                  >
+                                    Agregar meses
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!user.email || isBusy || !canApplyMonths || !user.premiumExpiresAt}
+                                    onClick={() =>
+                                      applyActionToUser(
+                                        user,
+                                        {
+                                          premium: true,
+                                          unlimited: false,
+                                          months,
+                                          monthAction: 'subtract',
+                                          toolAccess,
+                                          premiumTools,
+                                        },
+                                        'subtract-months'
+                                      )
+                                    }
+                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-amber-300 text-amber-700 bg-white hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                  >
+                                    Quitar meses
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!user.email || isBusy || !canApplyMonths}
+                                    onClick={() =>
+                                      applyActionToUser(
+                                        user,
+                                        {
+                                          premium: true,
+                                          unlimited: false,
+                                          months,
+                                          monthAction: 'set',
+                                          toolAccess,
+                                          premiumTools,
+                                        },
+                                        'set-months'
+                                      )
+                                    }
+                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                  >
+                                    Ajustar vencimiento
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!user.email || isBusy}
+                                  onClick={() =>
+                                    applyActionToUser(
+                                      user,
+                                      { premium: true, unlimited: true, toolAccess, premiumTools },
+                                      'vip'
+                                    )
+                                  }
+                                  className="px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                >
+                                  Convertir a VIP ilimitado
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!user.email || isBusy}
+                                  onClick={() =>
+                                    applyActionToUser(
+                                      user,
+                                      { premium: false, unlimited: false, toolAccess, premiumTools },
+                                      'remove'
+                                    )
+                                  }
+                                  className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                                >
+                                  Quitar premium completo
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>

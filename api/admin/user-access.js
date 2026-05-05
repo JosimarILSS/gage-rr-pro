@@ -64,6 +64,12 @@ const parsePremiumStatus = (rawValue) => {
   return ['all', 'active', 'expired', 'vip', 'noAccess'].includes(value) ? value : 'all';
 };
 
+const parseMonthAction = (rawValue) => {
+  if (rawValue == null || rawValue === '') return 'add';
+  const value = typeof rawValue === 'string' ? rawValue : '';
+  return ['add', 'subtract', 'set'].includes(value) ? value : null;
+};
+
 const normalizeSearchQuery = (rawValue) => {
   if (typeof rawValue !== 'string') return '';
   return rawValue.trim().toLowerCase();
@@ -218,6 +224,7 @@ module.exports = async function handler(req, res) {
   const premiumRaw = req.body?.premium;
   const unlimitedRaw = req.body?.unlimited;
   const monthsRaw = req.body?.months;
+  const monthAction = parseMonthAction(req.body?.monthAction);
   const hasPremiumChange = typeof premiumRaw === 'boolean';
   const hasToolAccessInput = req.body && typeof req.body.toolAccess === 'object' && req.body.toolAccess !== null;
   const hasPremiumToolsInput = req.body && typeof req.body.premiumTools === 'object' && req.body.premiumTools !== null;
@@ -248,6 +255,11 @@ module.exports = async function handler(req, res) {
 
   if (premium === false && unlimited) {
     res.status(400).json({ error: 'unlimited only applies when premium is true.' });
+    return;
+  }
+
+  if (!monthAction) {
+    res.status(400).json({ error: 'monthAction must be add, subtract, or set.' });
     return;
   }
 
@@ -302,14 +314,22 @@ module.exports = async function handler(req, res) {
       if (nextUnlimited) {
         premiumExpiresAt = null;
         premiumExpiresAtTimestamp = null;
-        premiumGrantedAtForResponse = now;
+        premiumGrantedAtForResponse = hasPremiumChange ? now : toDateOrNull(existingData.premiumGrantedAt);
       } else if (hasPremiumChange) {
         const currentExpiration = currentPremiumExpiresAt;
-        const baseDate =
-          currentExpiration && currentExpiration.getTime() > now.getTime()
-            ? currentExpiration
-            : now;
-        premiumExpiresAt = addMonths(baseDate, months);
+        if (monthAction === 'subtract') {
+          if (!currentExpiration) {
+            res.status(400).json({ error: 'Cannot subtract months without an existing premium expiration date.' });
+            return;
+          }
+          premiumExpiresAt = addMonths(currentExpiration, -months);
+        } else {
+          const baseDate =
+            monthAction === 'add' && currentExpiration && currentExpiration.getTime() > now.getTime()
+              ? currentExpiration
+              : now;
+          premiumExpiresAt = addMonths(baseDate, months);
+        }
         premiumExpiresAtTimestamp = Timestamp.fromDate(premiumExpiresAt);
         premiumGrantedAtForResponse = now;
       } else {
@@ -378,6 +398,7 @@ module.exports = async function handler(req, res) {
       premium: nextPremium,
       unlimited: nextPremium ? nextUnlimited : false,
       monthsApplied: hasPremiumChange && nextPremium && !nextUnlimited ? months : null,
+      monthActionApplied: hasPremiumChange && nextPremium && !nextUnlimited ? monthAction : null,
       expiresAt: premiumExpiresAt ? premiumExpiresAt.toISOString() : null,
       premiumGrantedAt: nextPremium
         ? (premiumGrantedAtForResponse ? premiumGrantedAtForResponse.toISOString() : now.toISOString())

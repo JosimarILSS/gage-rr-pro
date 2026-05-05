@@ -1,11 +1,14 @@
 import type { ToolFlags } from '../config/tools';
 
+type AdminPremiumMonthAction = 'add' | 'subtract' | 'set';
+
 type ManageUserAccessPayload = {
   email: string;
   displayName?: string;
   premium?: boolean;
   unlimited?: boolean;
   months?: number;
+  monthAction?: AdminPremiumMonthAction;
   toolAccess?: ToolFlags;
   premiumTools?: ToolFlags;
 };
@@ -44,6 +47,7 @@ type ManageUserAccessResult = {
   premium: boolean;
   unlimited: boolean;
   monthsApplied: number | null;
+  monthActionApplied: AdminPremiumMonthAction | null;
   expiresAt: string | null;
   premiumGrantedAt: string | null;
   toolAccess: ToolFlags;
@@ -123,4 +127,5 @@ export type {
   ListAdminUsersParams,
   AdminSearchField,
   AdminPremiumStatusFilter,
+  AdminPremiumMonthAction,
 };
