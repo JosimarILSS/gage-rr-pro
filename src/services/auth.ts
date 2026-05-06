@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import { db } from '../firebase';
 import { normalizeToolFlags, type ToolFlags } from '../config/tools';
 import type { Lang } from '../types/common';
+import { normalizeCompanyBrand, type CompanyBrand } from '../types/company';
 
 export type UserAccountProfile = {
   uid: string;
@@ -17,6 +18,8 @@ export type UserAccountProfile = {
   toolAccess: ToolFlags;
   premiumTools: ToolFlags;
   toolPremiumActive: ToolFlags;
+  companyId: string | null;
+  companyBrand: CompanyBrand | null;
   createdAt: number | null;
 };
 
@@ -41,10 +44,29 @@ const toTimestampMs = (value: unknown): number | null => {
   return null;
 };
 
+const normalizeCompanyId = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const readCompanyBrand = async (companyId: string | null): Promise<CompanyBrand | null> => {
+  if (!companyId) return null;
+
+  try {
+    const snap = await getDoc(doc(db, 'empresas', companyId));
+    if (!snap.exists()) return null;
+    return normalizeCompanyBrand(snap.id, snap.data());
+  } catch {
+    return null;
+  }
+};
+
 const buildProfile = (
   user: User,
   data: Record<string, unknown> = {},
-  claims: Record<string, unknown> = {}
+  claims: Record<string, unknown> = {},
+  companyBrand: CompanyBrand | null = null
 ): UserAccountProfile => {
   const hasFirestorePremium = typeof data.premium === 'boolean';
   const hasFirestoreExpiration = Object.prototype.hasOwnProperty.call(data, 'premiumExpiresAt');
@@ -71,6 +93,7 @@ const buildProfile = (
     ),
     false
   );
+  const companyId = normalizeCompanyId(data.companyId) || normalizeCompanyId(claims.companyId);
 
   return {
     uid: user.uid,
@@ -85,6 +108,8 @@ const buildProfile = (
     toolAccess,
     premiumTools,
     toolPremiumActive,
+    companyId,
+    companyBrand: companyId ? companyBrand : null,
     createdAt,
   };
 };
@@ -94,14 +119,22 @@ export const getUserAccountProfile = async (user: User | null): Promise<UserAcco
 
   try {
     const snap = await getDoc(doc(db, 'usuarios', user.uid));
-    if (snap.exists()) return buildProfile(user, snap.data());
+    if (snap.exists()) {
+      const data = snap.data();
+      const companyId = normalizeCompanyId(data.companyId);
+      const companyBrand = await readCompanyBrand(companyId);
+      return buildProfile(user, data, {}, companyBrand);
+    }
   } catch {
     // Si Firestore falla, se usa Custom Claims como respaldo.
   }
 
   try {
     const tokenResult = await user.getIdTokenResult(true);
-    return buildProfile(user, {}, tokenResult.claims as Record<string, unknown>);
+    const claims = tokenResult.claims as Record<string, unknown>;
+    const companyId = normalizeCompanyId(claims.companyId);
+    const companyBrand = await readCompanyBrand(companyId);
+    return buildProfile(user, {}, claims, companyBrand);
   } catch {
     return buildProfile(user);
   }

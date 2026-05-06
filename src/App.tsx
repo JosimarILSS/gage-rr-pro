@@ -10,6 +10,7 @@ import FeedForwardPage from './pages/FeedForwardPage';
 import AdminAccessGatePage from './pages/AdminAccessGatePage';
 import AdminUserAccessPage from './pages/AdminUserAccessPage';
 import { isToolEnabled } from './config/tools';
+import { CompanyBrandProvider } from './contexts/CompanyBrandContext';
 import type { AppTheme, Lang } from './types/common';
 
 const ADMIN_ROUTE = '/admin_user_access';
@@ -99,124 +100,132 @@ export default function App() {
     navigateTo(TOOLS_ROUTE, true);
   }, [hasBlockedToolRoute]);
 
-  if (authSession.loadingAuth) {
-    return <LoadingPage />;
-  }
+  const renderContent = () => {
+    if (authSession.loadingAuth) {
+      return <LoadingPage />;
+    }
 
-  if (isAdminRoute) {
-    if (!authSession.user) {
+    if (isAdminRoute) {
+      if (!authSession.user) {
+        return (
+          <AdminAccessGatePage
+            lang={lang}
+            appTheme={appTheme}
+            isAuthLoading={authSession.isAuthLoading}
+            authError={authSession.authError}
+            onGoogleLogin={authSession.handleLoginWithGoogle}
+            onBackHome={() => navigateTo(TOOLS_ROUTE)}
+            onToggleTheme={toggleTheme}
+          />
+        );
+      }
+
+      if (!isAuthorizedAdminUser) {
+        return <LoadingPage />;
+      }
+
       return (
-        <AdminAccessGatePage
-          lang={lang}
+        <AdminUserAccessPage
+          adminEmail={authSession.user.email || ''}
           appTheme={appTheme}
-          isAuthLoading={authSession.isAuthLoading}
-          authError={authSession.authError}
-          onGoogleLogin={authSession.handleLoginWithGoogle}
+          onLogout={handleLogout}
           onBackHome={() => navigateTo(TOOLS_ROUTE)}
           onToggleTheme={toggleTheme}
         />
       );
     }
 
-    if (!isAuthorizedAdminUser) {
-      return <LoadingPage />;
+    if (!authSession.user) {
+      return (
+        <LoginPage
+          lang={lang}
+          appTheme={appTheme}
+          authError={authSession.authError}
+          isAuthLoading={authSession.isAuthLoading}
+          onGoogleLogin={authSession.handleLoginWithGoogle}
+          onEmailLogin={authSession.handleLoginWithEmail}
+          onEmailRegister={authSession.handleRegisterWithEmail}
+          onToggleLang={toggleLang}
+          onToggleTheme={toggleTheme}
+        />
+      );
+    }
+
+    if (isGageRRToolRoute && hasGageRRAccess) {
+      return (
+        <AnalysisPage
+          lang={lang}
+          appTheme={appTheme}
+          onToggleLang={toggleLang}
+          onToggleTheme={toggleTheme}
+          userEmail={authSession.user.email}
+          onLogout={handleLogout}
+          esPremium={authSession.esPremium}
+          isCheckoutLoading={authSession.isCheckoutLoading}
+          checkoutError={authSession.checkoutError}
+          onUnlockPremium={authSession.handleUnlockPremium}
+          workspace={workspace}
+          onBackToTools={() => navigateTo(TOOLS_ROUTE)}
+          showAdminAccessButton={canSeeAdminEntry}
+          onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
+        />
+      );
+    }
+
+    if (isSixSigmaToolRoute && hasSixSigmaAccess) {
+      return (
+        <SixSigmaPage
+          lang={lang}
+          appTheme={appTheme}
+          onToggleLang={toggleLang}
+          onToggleTheme={toggleTheme}
+          onBackToTools={() => navigateTo(TOOLS_ROUTE)}
+        />
+      );
+    }
+
+    if (isFeedForwardToolRoute && hasFeedForwardAccess) {
+      return (
+        <FeedForwardPage
+          lang={lang}
+          appTheme={appTheme}
+          onToggleLang={toggleLang}
+          onToggleTheme={toggleTheme}
+          onBackToTools={() => navigateTo(TOOLS_ROUTE)}
+          getIdToken={() => authSession.user!.getIdToken()}
+        />
+      );
     }
 
     return (
-      <AdminUserAccessPage
-        adminEmail={authSession.user.email || ''}
-        appTheme={appTheme}
-        onLogout={handleLogout}
-        onBackHome={() => navigateTo(TOOLS_ROUTE)}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
-
-  if (!authSession.user) {
-    return (
-      <LoginPage
-        lang={lang}
-        appTheme={appTheme}
-        authError={authSession.authError}
-        isAuthLoading={authSession.isAuthLoading}
-        onGoogleLogin={authSession.handleLoginWithGoogle}
-        onEmailLogin={authSession.handleLoginWithEmail}
-        onEmailRegister={authSession.handleRegisterWithEmail}
-        onToggleLang={toggleLang}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
-
-  if (isGageRRToolRoute && hasGageRRAccess) {
-    return (
-      <AnalysisPage
+      <ToolsPage
         lang={lang}
         appTheme={appTheme}
         onToggleLang={toggleLang}
         onToggleTheme={toggleTheme}
+        accountProfile={authSession.accountProfile}
         userEmail={authSession.user.email}
+        userDisplayName={authSession.user.displayName}
+        userPhotoURL={authSession.user.photoURL}
+        signInProvider={authSession.signInProvider}
         onLogout={handleLogout}
         esPremium={authSession.esPremium}
         isCheckoutLoading={authSession.isCheckoutLoading}
         checkoutError={authSession.checkoutError}
         onUnlockPremium={authSession.handleUnlockPremium}
-        workspace={workspace}
-        onBackToTools={() => navigateTo(TOOLS_ROUTE)}
+        onOpenGageRR={() => navigateTo(GAGE_RR_TOOL_ROUTE)}
+        onOpenSixSigma={() => navigateTo(SIX_SIGMA_TOOL_ROUTE)}
+        onOpenFeedForward={() => navigateTo(FEED_FORWARD_TOOL_ROUTE)}
+        toolAccess={authSession.accountProfile?.toolAccess}
         showAdminAccessButton={canSeeAdminEntry}
         onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
       />
     );
-  }
-
-  if (isSixSigmaToolRoute && hasSixSigmaAccess) {
-    return (
-      <SixSigmaPage
-        lang={lang}
-        appTheme={appTheme}
-        onToggleLang={toggleLang}
-        onToggleTheme={toggleTheme}
-        onBackToTools={() => navigateTo(TOOLS_ROUTE)}
-      />
-    );
-  }
-
-  if (isFeedForwardToolRoute && hasFeedForwardAccess) {
-    return (
-      <FeedForwardPage
-        lang={lang}
-        appTheme={appTheme}
-        onToggleLang={toggleLang}
-        onToggleTheme={toggleTheme}
-        onBackToTools={() => navigateTo(TOOLS_ROUTE)}
-        getIdToken={() => authSession.user!.getIdToken()}
-      />
-    );
-  }
+  };
 
   return (
-    <ToolsPage
-      lang={lang}
-      appTheme={appTheme}
-      onToggleLang={toggleLang}
-      onToggleTheme={toggleTheme}
-      accountProfile={authSession.accountProfile}
-      userEmail={authSession.user.email}
-      userDisplayName={authSession.user.displayName}
-      userPhotoURL={authSession.user.photoURL}
-      signInProvider={authSession.signInProvider}
-      onLogout={handleLogout}
-      esPremium={authSession.esPremium}
-      isCheckoutLoading={authSession.isCheckoutLoading}
-      checkoutError={authSession.checkoutError}
-      onUnlockPremium={authSession.handleUnlockPremium}
-      onOpenGageRR={() => navigateTo(GAGE_RR_TOOL_ROUTE)}
-      onOpenSixSigma={() => navigateTo(SIX_SIGMA_TOOL_ROUTE)}
-      onOpenFeedForward={() => navigateTo(FEED_FORWARD_TOOL_ROUTE)}
-      toolAccess={authSession.accountProfile?.toolAccess}
-      showAdminAccessButton={canSeeAdminEntry}
-      onGoToAdminAccess={() => navigateTo(ADMIN_ROUTE)}
-    />
+    <CompanyBrandProvider brand={isAdminRoute ? null : authSession.accountProfile?.companyBrand || null}>
+      {renderContent()}
+    </CompanyBrandProvider>
   );
 }

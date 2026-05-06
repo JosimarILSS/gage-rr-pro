@@ -11,6 +11,29 @@ type ManageUserAccessPayload = {
   monthAction?: AdminPremiumMonthAction;
   toolAccess?: ToolFlags;
   premiumTools?: ToolFlags;
+  companyId?: string | null;
+};
+
+type AdminCompany = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  logoAlt: string | null;
+  primaryColor: string;
+  headerColor: string;
+  logoBackgroundColor: string;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+type CreateAdminCompanyPayload = {
+  name: string;
+  logoUrl?: string | null;
+  logoAlt?: string | null;
+  primaryColor: string;
+  headerColor: string;
+  logoBackgroundColor: string;
 };
 
 type AdminSearchField = 'all' | 'email' | 'displayName';
@@ -28,8 +51,19 @@ type AdminListedUser = {
   premiumExpiresAt: string | null;
   toolAccess: ToolFlags;
   premiumTools: ToolFlags;
+  companyId: string | null;
   createdAt: string | null;
   lastSignInAt: string | null;
+};
+
+type ListAdminCompaniesResult = {
+  ok: boolean;
+  companies: AdminCompany[];
+};
+
+type CreateAdminCompanyResult = {
+  ok: boolean;
+  company: AdminCompany;
 };
 
 type ListAdminUsersResult = {
@@ -52,6 +86,7 @@ type ManageUserAccessResult = {
   premiumGrantedAt: string | null;
   toolAccess: ToolFlags;
   premiumTools: ToolFlags;
+  companyId: string | null;
 };
 
 type ListAdminUsersParams = {
@@ -119,11 +154,55 @@ export const manageUserAccess = async (
   return data as ManageUserAccessResult;
 };
 
+export const listAdminCompanies = async (
+  apiBaseUrl: string,
+  token: string
+): Promise<ListAdminCompaniesResult> => {
+  const response = await fetch(`${apiBaseUrl}/api/admin/companies`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Could not list companies.');
+  }
+
+  return data as ListAdminCompaniesResult;
+};
+
+export const createAdminCompany = async (
+  apiBaseUrl: string,
+  token: string,
+  payload: CreateAdminCompanyPayload
+): Promise<CreateAdminCompanyResult> => {
+  const response = await fetch(`${apiBaseUrl}/api/admin/companies`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Could not create company.');
+  }
+
+  return data as CreateAdminCompanyResult;
+};
+
 export type {
   ManageUserAccessPayload,
   ManageUserAccessResult,
   AdminListedUser,
+  AdminCompany,
+  CreateAdminCompanyPayload,
   ListAdminUsersResult,
+  ListAdminCompaniesResult,
   ListAdminUsersParams,
   AdminSearchField,
   AdminPremiumStatusFilter,

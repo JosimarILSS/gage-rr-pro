@@ -1,8 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, Home, KeyRound, LogOut, RefreshCw, Save, Search, ShieldCheck, UserPlus } from 'lucide-react';
 import {
+  Building2,
+  CalendarClock,
+  Home,
+  Image,
+  KeyRound,
+  LogOut,
+  Palette,
+  RefreshCw,
+  Save,
+  Search,
+  ShieldCheck,
+  UserPlus,
+  X,
+} from 'lucide-react';
+import {
+  createAdminCompany,
+  listAdminCompanies,
   listAdminUsers,
   manageUserAccess,
+  type AdminCompany,
   type AdminPremiumMonthAction,
   type AdminListedUser,
   type AdminPremiumStatusFilter,
@@ -37,7 +54,23 @@ export default function AdminUserAccessPage({
   const [newUserMonthsInput, setNewUserMonthsInput] = useState('6');
   const [newUserToolAccess, setNewUserToolAccess] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
   const [newUserPremiumTools, setNewUserPremiumTools] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
+  const [newUserCompanyId, setNewUserCompanyId] = useState<string | null>(null);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  const [companies, setCompanies] = useState<AdminCompany[]>([]);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [companyForm, setCompanyForm] = useState({
+    name: '',
+    logoUrl: '',
+    logoAlt: '',
+    primaryColor: '#2476ff',
+    headerColor: '#0e1628',
+    logoBackgroundColor: '#ffffff',
+  });
+  const [companyModalTarget, setCompanyModalTarget] = useState<
+    { type: 'new' } | { type: 'existing'; user: AdminListedUser } | null
+  >(null);
 
   const [users, setUsers] = useState<AdminListedUser[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
@@ -65,6 +98,18 @@ export default function AdminUserAccessPage({
       (import.meta.env.DEV ? 'http://localhost:4242' : ''),
     []
   );
+  const companyById = useMemo(
+    () => new Map(companies.map((company) => [company.id, company])),
+    [companies]
+  );
+
+  const getCompanyLabel = (companyId: string | null | undefined) => {
+    if (!companyId) return 'Sin empresa';
+    return companyById.get(companyId)?.name || 'Empresa no encontrada';
+  };
+
+  const getCompanyLogoAlt = (company: AdminCompany) =>
+    company.logoAlt || company.name || 'Logo de empresa';
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -86,6 +131,26 @@ export default function AdminUserAccessPage({
 
   const hasActiveFilters =
     Boolean(searchQuery) || searchField !== 'all' || premiumStatusFilter !== 'all';
+
+  const loadCompanies = useCallback(async () => {
+    setIsLoadingCompanies(true);
+    setError(null);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No hay sesion activa.');
+      }
+
+      const token = await currentUser.getIdToken(true);
+      const data = await listAdminCompanies(apiBaseUrl, token);
+      setCompanies(data.companies);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo cargar el listado de empresas.');
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  }, [apiBaseUrl]);
 
   const formatDate = (value: string | null): string => {
     if (!value) return '—';
@@ -139,6 +204,7 @@ export default function AdminUserAccessPage({
               : null,
           toolAccess: normalizeToolFlags(result.toolAccess, true),
           premiumTools: normalizeToolFlags(result.premiumTools, true),
+          companyId: result.companyId,
         };
       })
     );
@@ -238,6 +304,10 @@ export default function AdminUserAccessPage({
   );
 
   useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
+
+  useEffect(() => {
     loadUsers(false, null, listParams);
   }, [loadUsers, listParams]);
 
@@ -284,6 +354,59 @@ export default function AdminUserAccessPage({
     setNewUserMonthsInput(normalized);
   };
 
+  const updateCompanyForm = (key: keyof typeof companyForm, value: string) => {
+    setCompanyForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleCreateCompany = async () => {
+    const normalizedName = companyForm.name.trim();
+    const normalizedLogoUrl = companyForm.logoUrl.trim();
+    const normalizedLogoAlt = companyForm.logoAlt.trim();
+
+    if (!normalizedName) {
+      setError('Ingresa el nombre de la empresa.');
+      return;
+    }
+
+    setIsCreatingCompany(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No hay sesión activa.');
+      }
+
+      const token = await currentUser.getIdToken(true);
+      const result = await createAdminCompany(apiBaseUrl, token, {
+        name: normalizedName,
+        logoUrl: normalizedLogoUrl || null,
+        logoAlt: normalizedLogoAlt || null,
+        primaryColor: companyForm.primaryColor,
+        headerColor: companyForm.headerColor,
+        logoBackgroundColor: companyForm.logoBackgroundColor,
+      });
+
+      setCompanies((current) =>
+        [...current, result.company].sort((a, b) => a.name.localeCompare(b.name, 'es-MX'))
+      );
+      setCompanyForm({
+        name: '',
+        logoUrl: '',
+        logoAlt: '',
+        primaryColor: '#2476ff',
+        headerColor: '#0e1628',
+        logoBackgroundColor: '#ffffff',
+      });
+      setSuccess(`Empresa creada: ${result.company.name}.`);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo crear la empresa.');
+    } finally {
+      setIsCreatingCompany(false);
+    }
+  };
+
   const handleCreateUser = async () => {
     const normalizedEmail = newUserEmail.trim().toLowerCase();
     const normalizedDisplayName = newUserDisplayName.trim();
@@ -325,6 +448,7 @@ export default function AdminUserAccessPage({
         monthAction: newUserAccessMode === 'months' ? 'set' : undefined,
         toolAccess: newUserToolAccess,
         premiumTools: newUserPremiumTools,
+        companyId: newUserCompanyId,
       };
 
       const result = await manageUserAccess(apiBaseUrl, token, payload);
@@ -342,6 +466,7 @@ export default function AdminUserAccessPage({
       setNewUserMonthsInput('6');
       setNewUserToolAccess(buildDefaultToolFlags(true));
       setNewUserPremiumTools(buildDefaultToolFlags(true));
+      setNewUserCompanyId(null);
     } catch (err: any) {
       setError(err?.message || 'No se pudo crear/actualizar el usuario.');
     } finally {
@@ -358,6 +483,7 @@ export default function AdminUserAccessPage({
       monthAction?: AdminPremiumMonthAction;
       toolAccess?: ToolFlags;
       premiumTools?: ToolFlags;
+      companyId?: string | null;
     },
     actionLabel: string
   ) => {
@@ -402,6 +528,32 @@ export default function AdminUserAccessPage({
       'tools'
     );
   };
+
+  const handleSelectCompanyFromModal = async (companyId: string | null) => {
+    if (!companyModalTarget) return;
+
+    if (companyModalTarget.type === 'new') {
+      setNewUserCompanyId(companyId);
+      setCompanyModalTarget(null);
+      return;
+    }
+
+    const targetUser = companyModalTarget.user;
+    await applyActionToUser(
+      targetUser,
+      { companyId },
+      'company'
+    );
+    setCompanyModalTarget(null);
+  };
+
+  const selectedModalCompanyId =
+    companyModalTarget?.type === 'new'
+      ? newUserCompanyId
+      : companyModalTarget?.user.companyId || null;
+  const isCompanyModalApplying =
+    companyModalTarget?.type === 'existing' &&
+    activeActionKey?.startsWith(`${companyModalTarget.user.uid}:`) === true;
 
   return (
     <div className="min-h-screen app-shell font-sans">
@@ -454,6 +606,183 @@ export default function AdminUserAccessPage({
           <div className="border border-slate-200 rounded-2xl bg-slate-50">
             <div className="p-5 border-b border-slate-200 flex flex-col gap-1">
               <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-base font-semibold text-slate-800">Empresas</h2>
+              </div>
+              <p className="text-sm text-slate-500">
+                Crea configuraciones de marca para asignarlas después a usuarios nuevos o existentes.
+              </p>
+            </div>
+
+            <div className="p-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5">
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Empresas registradas</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Estas opciones aparecen en el modal de asignación de empresa.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadCompanies}
+                    disabled={isLoadingCompanies}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCompanies ? 'animate-spin' : ''}`} />
+                    Recargar
+                  </button>
+                </div>
+
+                {isLoadingCompanies ? (
+                  <div className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    Cargando empresas...
+                  </div>
+                ) : companies.length === 0 ? (
+                  <div className="mt-4 text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    Todavía no hay empresas registradas.
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {companies.map((company) => (
+                      <div key={company.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-14 h-14 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
+                            style={{ backgroundColor: company.logoBackgroundColor }}
+                          >
+                            {company.logoUrl ? (
+                              <img
+                                src={company.logoUrl}
+                                alt={getCompanyLogoAlt(company)}
+                                className="w-full h-full object-contain p-1"
+                              />
+                            ) : (
+                              <Building2 className="w-6 h-6 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 truncate">{company.name}</p>
+                            <p className="text-xs text-slate-500 truncate">ID: {company.id}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-slate-300"
+                                  style={{ backgroundColor: company.primaryColor }}
+                                />
+                                Primario
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-slate-300"
+                                  style={{ backgroundColor: company.headerColor }}
+                                />
+                                Header
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-start gap-2">
+                  <Palette className="w-4 h-4 text-indigo-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Crear empresa</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      El logo se guarda como URL pública; los colores se aplican al entrar con un usuario asignado.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-slate-600">Nombre</span>
+                    <input
+                      type="text"
+                      value={companyForm.name}
+                      onChange={(event) => updateCompanyForm('name', event.target.value)}
+                      placeholder="Nombre de la empresa"
+                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-slate-600">URL del logo</span>
+                    <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-indigo-300">
+                      <Image className="w-4 h-4 text-slate-400" />
+                      <input
+                        type="url"
+                        value={companyForm.logoUrl}
+                        onChange={(event) => updateCompanyForm('logoUrl', event.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-transparent outline-none text-sm"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-slate-600">Texto alternativo del logo</span>
+                    <input
+                      type="text"
+                      value={companyForm.logoAlt}
+                      onChange={(event) => updateCompanyForm('logoAlt', event.target.value)}
+                      placeholder="Opcional"
+                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-slate-600">Primario</span>
+                      <input
+                        type="color"
+                        value={companyForm.primaryColor}
+                        onChange={(event) => updateCompanyForm('primaryColor', event.target.value)}
+                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-slate-600">Header</span>
+                      <input
+                        type="color"
+                        value={companyForm.headerColor}
+                        onChange={(event) => updateCompanyForm('headerColor', event.target.value)}
+                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-slate-600">Fondo logo</span>
+                      <input
+                        type="color"
+                        value={companyForm.logoBackgroundColor}
+                        onChange={(event) => updateCompanyForm('logoBackgroundColor', event.target.value)}
+                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateCompany}
+                    disabled={isCreatingCompany}
+                    className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isCreatingCompany ? 'Creando empresa...' : 'Crear empresa'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-2xl bg-slate-50">
+            <div className="p-5 border-b border-slate-200 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-indigo-600" />
                 <h2 className="text-base font-semibold text-slate-800">Crear o actualizar usuario</h2>
               </div>
@@ -484,6 +813,29 @@ export default function AdminUserAccessPage({
                     className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
                 </label>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl p-4 bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Empresa asignada</p>
+                    <p className="text-sm text-slate-600 mt-1">{getCompanyLabel(newUserCompanyId)}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Si queda sin empresa, el usuario verá el diseño default.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCompanyModalTarget({ type: 'new' })}
+                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl px-4 py-2.5 transition-colors cursor-pointer"
+                >
+                  <Building2 className="w-4 h-4" />
+                  Escoger empresa
+                </button>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[260px_220px_minmax(0,1fr)] gap-4 items-start">
@@ -657,11 +1009,12 @@ export default function AdminUserAccessPage({
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="min-w-[1580px] w-full text-sm">
+              <table className="min-w-[1760px] w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-left text-slate-700">
                     <th className="px-4 py-3 font-semibold">Usuario</th>
                     <th className="px-4 py-3 font-semibold">Correo</th>
+                    <th className="px-4 py-3 font-semibold">Empresa</th>
                     <th className="px-4 py-3 font-semibold">Estado premium</th>
                     <th className="px-4 py-3 font-semibold">Herramientas</th>
                     <th className="px-4 py-3 font-semibold">Obtenido</th>
@@ -677,6 +1030,7 @@ export default function AdminUserAccessPage({
                     const isBusy = activeActionKey?.startsWith(`${user.uid}:`) === true;
                     const toolAccess = toolAccessByUser[user.uid] || normalizeToolFlags(user.toolAccess, true);
                     const premiumTools = premiumToolsByUser[user.uid] || normalizeToolFlags(user.premiumTools, true);
+                    const assignedCompany = user.companyId ? companyById.get(user.companyId) : null;
 
                     const stateLabel = user.premiumActive
                       ? user.premiumUnlimited
@@ -721,6 +1075,45 @@ export default function AdminUserAccessPage({
                           ) : (
                             <span className="text-slate-400">Sin correo</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              {assignedCompany?.logoUrl ? (
+                                <span
+                                  className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
+                                  style={{ backgroundColor: assignedCompany.logoBackgroundColor }}
+                                >
+                                  <img
+                                    src={assignedCompany.logoUrl}
+                                    alt={getCompanyLogoAlt(assignedCompany)}
+                                    className="w-full h-full object-contain p-1"
+                                  />
+                                </span>
+                              ) : (
+                                <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center shrink-0">
+                                  <Building2 className="w-4 h-4" />
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800 truncate">
+                                  {getCompanyLabel(user.companyId)}
+                                </p>
+                                {user.companyId && !assignedCompany && (
+                                  <p className="text-xs text-amber-600">Revisa si fue eliminada</p>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!user.email || isBusy}
+                              onClick={() => setCompanyModalTarget({ type: 'existing', user })}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                            >
+                              <Building2 className="w-3.5 h-3.5" />
+                              Escoger empresa
+                            </button>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2.5 py-1 rounded-lg border text-xs font-medium ${stateStyle}`}>
@@ -942,7 +1335,7 @@ export default function AdminUserAccessPage({
 
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                      <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                         {hasActiveFilters
                           ? 'No se encontraron usuarios con ese filtro.'
                           : 'No hay usuarios para mostrar.'}
@@ -980,6 +1373,130 @@ export default function AdminUserAccessPage({
           <div ref={infiniteLoaderRef} className="h-2" aria-hidden="true" />
         </div>
       </div>
+
+      {companyModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Cerrar selector de empresa"
+            onClick={() => setCompanyModalTarget(null)}
+            className="absolute inset-0 bg-slate-900/50 cursor-pointer"
+          />
+          <div className="relative z-10 w-full max-w-4xl max-h-[88vh] overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-2xl">
+            <div className="p-5 border-b border-slate-200 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">Escoger empresa</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {companyModalTarget.type === 'new'
+                    ? 'Selecciona la empresa para el usuario que estás creando o actualizando.'
+                    : `Selecciona la empresa para ${companyModalTarget.user.email || 'este usuario'}.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompanyModalTarget(null)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 cursor-pointer"
+                aria-label="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto max-h-[calc(88vh-96px)] space-y-4">
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-white text-slate-500 border border-slate-200 flex items-center justify-center shrink-0">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Sin empresa</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Mantiene el logo, colores y diseño default de la plataforma.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedModalCompanyId === null || isCompanyModalApplying}
+                  onClick={() => handleSelectCompanyFromModal(null)}
+                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                >
+                  {selectedModalCompanyId === null ? 'Seleccionado' : 'Usar default'}
+                </button>
+              </div>
+
+              {companies.length === 0 ? (
+                <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  No hay empresas disponibles. Crea una empresa primero desde el apartado de empresas.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {companies.map((company) => {
+                    const isSelected = selectedModalCompanyId === company.id;
+
+                    return (
+                      <div key={company.id} className="border border-slate-200 rounded-xl p-4 bg-white">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-16 h-16 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
+                            style={{ backgroundColor: company.logoBackgroundColor }}
+                          >
+                            {company.logoUrl ? (
+                              <img
+                                src={company.logoUrl}
+                                alt={getCompanyLogoAlt(company)}
+                                className="w-full h-full object-contain p-1"
+                              />
+                            ) : (
+                              <Building2 className="w-7 h-7 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{company.name}</p>
+                              {isSelected && (
+                                <span className="inline-flex px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                                  Seleccionada
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate mt-1">ID: {company.id}</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-slate-300"
+                                  style={{ backgroundColor: company.primaryColor }}
+                                />
+                                Primario
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-slate-300"
+                                  style={{ backgroundColor: company.headerColor }}
+                                />
+                                Header
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isSelected || isCompanyModalApplying}
+                          onClick={() => handleSelectCompanyFromModal(company.id)}
+                          className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
+                        >
+                          {isSelected ? 'Seleccionada' : 'Escoger esta empresa'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

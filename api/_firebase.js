@@ -77,6 +77,7 @@ const registerUserIfNew = async (uid) => {
       premiumExpiresAt: null,
       premiumGrantedAt: null,
       premiumSource: null,
+      companyId: null,
       toolAccess: buildDefaultToolFlags(true),
       premiumTools: buildDefaultToolFlags(true),
       lastStripeSessionId: null,

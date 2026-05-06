@@ -4,6 +4,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldPath, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
 const { normalizeToolFlags } = require('../_tools.js');
+const { COMPANIES_COLLECTION, normalizeCompanyIdInput } = require('../_companies.js');
 
 const parseAllowedAdminEmails = (rawValue) =>
   (rawValue || '')
@@ -108,6 +109,7 @@ const mapUserFromProfileDoc = (docSnap, nowMs) => {
   const premiumActive = premium && (premiumUnlimited || premiumExpiresAtDate.getTime() > nowMs);
   const toolAccess = normalizeToolFlags(profile.toolAccess, true);
   const premiumTools = normalizeToolFlags(profile.premiumTools, true);
+  const companyId = normalizeCompanyIdInput(profile.companyId);
 
   return {
     uid: docSnap.id,
@@ -121,6 +123,7 @@ const mapUserFromProfileDoc = (docSnap, nowMs) => {
     premiumExpiresAt: toIsoOrNull(premiumExpiresAtDate),
     toolAccess,
     premiumTools,
+    companyId,
     createdAt: toIsoOrNull(profile.createdAt),
     lastSignInAt: toIsoOrNull(profile.lastSignInAt),
   };
@@ -228,6 +231,7 @@ module.exports = async function handler(req, res) {
   const hasPremiumChange = typeof premiumRaw === 'boolean';
   const hasToolAccessInput = req.body && typeof req.body.toolAccess === 'object' && req.body.toolAccess !== null;
   const hasPremiumToolsInput = req.body && typeof req.body.premiumTools === 'object' && req.body.premiumTools !== null;
+  const hasCompanyInput = req.body && Object.prototype.hasOwnProperty.call(req.body, 'companyId');
 
   const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
   const displayName = typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
@@ -237,6 +241,7 @@ module.exports = async function handler(req, res) {
   const months = monthsRaw == null || monthsRaw === '' ? 6 : Number(monthsRaw);
   const toolAccessInput = normalizeToolFlags(req.body?.toolAccess, true);
   const premiumToolsInput = normalizeToolFlags(req.body?.premiumTools, true);
+  const companyIdInput = hasCompanyInput ? normalizeCompanyIdInput(req.body?.companyId) : null;
 
   if (!email || !isValidEmail(email)) {
     res.status(400).json({ error: 'Invalid email.' });
@@ -248,7 +253,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!hasPremiumChange && !hasToolAccessInput && !hasPremiumToolsInput && !hasDisplayName) {
+  if (!hasPremiumChange && !hasToolAccessInput && !hasPremiumToolsInput && !hasDisplayName && !hasCompanyInput) {
     res.status(400).json({ error: 'No changes were provided.' });
     return;
   }
@@ -266,6 +271,20 @@ module.exports = async function handler(req, res) {
   if (premium === true && !unlimited && (!Number.isInteger(months) || months <= 0)) {
     res.status(400).json({ error: 'months must be a positive integer.' });
     return;
+  }
+
+  if (companyIdInput) {
+    try {
+      const companySnap = await db.collection(COMPANIES_COLLECTION).doc(companyIdInput).get();
+      if (!companySnap.exists) {
+        res.status(400).json({ error: 'Selected company does not exist.' });
+        return;
+      }
+    } catch (error) {
+      console.error('[admin-user-access] Company validation failed:', error.message);
+      res.status(500).json({ error: 'Could not validate selected company.' });
+      return;
+    }
   }
 
   try {
@@ -305,6 +324,8 @@ module.exports = async function handler(req, res) {
     const nextPremiumTools = hasPremiumToolsInput
       ? premiumToolsInput
       : normalizeToolFlags(existingData.premiumTools, true);
+    const existingCompanyId = normalizeCompanyIdInput(existingData.companyId);
+    const nextCompanyId = hasCompanyInput ? companyIdInput : existingCompanyId;
 
     let premiumExpiresAt = null;
     let premiumExpiresAtTimestamp = null;
@@ -348,6 +369,7 @@ module.exports = async function handler(req, res) {
       premiumExpiresAt: premiumExpiresAtTimestamp ? premiumExpiresAtTimestamp.toMillis() : null,
       toolAccess: nextToolAccess,
       premiumTools: nextPremiumTools,
+      companyId: nextCompanyId,
     });
 
     const serverNow = FieldValue.serverTimestamp();
@@ -361,6 +383,7 @@ module.exports = async function handler(req, res) {
         premiumExpiresAt: premiumExpiresAtTimestamp,
         premiumGrantedAt: nextPremium ? serverNow : null,
         premiumSource: nextPremium ? 'manual' : null,
+        companyId: nextCompanyId,
         toolAccess: nextToolAccess,
         premiumTools: nextPremiumTools,
         lastStripeSessionId: null,
@@ -373,6 +396,7 @@ module.exports = async function handler(req, res) {
         premium: nextPremium,
         premiumExpiresAt: premiumExpiresAtTimestamp,
         premiumSource: nextPremium ? (existingData.premiumSource || 'manual') : null,
+        companyId: nextCompanyId,
         toolAccess: nextToolAccess,
         premiumTools: nextPremiumTools,
         updatedAt: serverNow,
@@ -405,6 +429,7 @@ module.exports = async function handler(req, res) {
         : null,
       toolAccess: nextToolAccess,
       premiumTools: nextPremiumTools,
+      companyId: nextCompanyId,
     });
   } catch (error) {
     console.error('[admin-user-access] Failed:', error.message);
