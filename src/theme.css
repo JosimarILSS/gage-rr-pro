@@ -44,7 +44,7 @@
   --app-header-border: #2c477f;
   --app-header-shadow: 0 10px 30px rgb(0 0 0 / 0.24);
   --app-logo-bg: rgb(255 255 255 / 0);
-  --app-logo-border: rgb(255 255 255 / 0.32);
+  --app-logo-border: rgb(255 255 255 / 0);
   --app-logo-shadow: 0 12px 36px rgb(0 0 0 / 0.22);
 
   --app-radius: 8px;
@@ -172,6 +172,12 @@ body,
   border: 1px solid var(--app-logo-border);
   box-shadow: var(--app-logo-shadow);
   padding: 0.45rem 0.85rem;
+}
+
+.app-navbar-brand-night {
+  background: transparent;
+  border-color: rgb(255 255 255 / 0.18);
+  box-shadow: none;
 }
 
 .app-navbar-logo {

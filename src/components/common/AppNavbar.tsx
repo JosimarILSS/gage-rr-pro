@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import ilssWhiteLogo from '../../assets/ilss-group-logo-blanco.png';
 import ilssLogo from '../../assets/ilss-group-logo.png';
 import { useCompanyBrand } from '../../contexts/CompanyBrandContext';
 import type { AppTheme, Lang } from '../../types/common';
@@ -21,9 +22,14 @@ export default function AppNavbar({
 }: AppNavbarProps) {
   const companyBrand = useCompanyBrand();
   const isNight = appTheme === 'night';
+  const defaultLogoSrc = isNight ? ilssWhiteLogo : ilssLogo;
   const brandName = companyBrand?.name || 'International Lean Six Sigma Group';
-  const logoSrc = companyBrand?.logoUrl || ilssLogo;
+  const logoSrc = companyBrand?.logoUrl || defaultLogoSrc;
   const logoAlt = companyBrand?.logoAlt || brandName;
+  const brandClassName =
+    !companyBrand?.logoUrl && isNight
+      ? 'app-navbar-brand app-navbar-brand-night'
+      : 'app-navbar-brand';
   const toggleLabel =
     lang === 'es'
       ? `Cambiar a modo ${isNight ? 'día' : 'noche'}`
@@ -34,7 +40,7 @@ export default function AppNavbar({
       <div className="app-container app-navbar-inner">
         <div className="app-navbar-left">{left}</div>
 
-        <div className="app-navbar-brand" aria-label={brandName}>
+        <div className={brandClassName} aria-label={brandName}>
           <img src={logoSrc} alt={logoAlt} className="app-navbar-logo" />
         </div>
 
