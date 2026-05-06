@@ -7,11 +7,15 @@ import {
   KeyRound,
   LogOut,
   Palette,
+  Pencil,
+  Plus,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
+  UserCog,
   UserPlus,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -20,7 +24,6 @@ import {
   listAdminUsers,
   manageUserAccess,
   type AdminCompany,
-  type AdminPremiumMonthAction,
   type AdminListedUser,
   type AdminPremiumStatusFilter,
   type AdminSearchField,
@@ -41,6 +44,49 @@ type AdminUserAccessPageProps = {
   onToggleTheme: () => void;
 };
 
+type AdminTab = 'users' | 'create' | 'companies';
+type AccessMode = 'months' | 'vip' | 'none';
+
+type UserEditorForm = {
+  email: string;
+  displayName: string;
+  accessMode: AccessMode;
+  monthsInput: string;
+  companyId: string | null;
+  toolAccess: ToolFlags;
+  premiumTools: ToolFlags;
+};
+
+type CompanyForm = {
+  name: string;
+  logoUrl: string;
+  logoAlt: string;
+  primaryColor: string;
+  headerColor: string;
+  logoBackgroundColor: string;
+};
+
+const emptyUserForm = (): UserEditorForm => ({
+  email: '',
+  displayName: '',
+  accessMode: 'months',
+  monthsInput: '6',
+  companyId: null,
+  toolAccess: buildDefaultToolFlags(true),
+  premiumTools: buildDefaultToolFlags(true),
+});
+
+const emptyCompanyForm = (): CompanyForm => ({
+  name: '',
+  logoUrl: '',
+  logoAlt: '',
+  primaryColor: '#2476ff',
+  headerColor: '#0e1628',
+  logoBackgroundColor: '#ffffff',
+});
+
+const locale = 'es-MX';
+
 export default function AdminUserAccessPage({
   adminEmail,
   appTheme,
@@ -48,38 +94,23 @@ export default function AdminUserAccessPage({
   onBackHome,
   onToggleTheme,
 }: AdminUserAccessPageProps) {
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserDisplayName, setNewUserDisplayName] = useState('');
-  const [newUserAccessMode, setNewUserAccessMode] = useState<'months' | 'vip' | 'none'>('months');
-  const [newUserMonthsInput, setNewUserMonthsInput] = useState('6');
-  const [newUserToolAccess, setNewUserToolAccess] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
-  const [newUserPremiumTools, setNewUserPremiumTools] = useState<ToolFlags>(() => buildDefaultToolFlags(true));
-  const [newUserCompanyId, setNewUserCompanyId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
+  const [createForm, setCreateForm] = useState<UserEditorForm>(() => emptyUserForm());
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  const [editingUser, setEditingUser] = useState<AdminListedUser | null>(null);
+  const [editForm, setEditForm] = useState<UserEditorForm>(() => emptyUserForm());
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
-  const [companyForm, setCompanyForm] = useState({
-    name: '',
-    logoUrl: '',
-    logoAlt: '',
-    primaryColor: '#2476ff',
-    headerColor: '#0e1628',
-    logoBackgroundColor: '#ffffff',
-  });
-  const [companyModalTarget, setCompanyModalTarget] = useState<
-    { type: 'new' } | { type: 'existing'; user: AdminListedUser } | null
-  >(null);
+  const [companyForm, setCompanyForm] = useState<CompanyForm>(() => emptyCompanyForm());
 
   const [users, setUsers] = useState<AdminListedUser[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [activeActionKey, setActiveActionKey] = useState<string | null>(null);
-  const [monthsByUser, setMonthsByUser] = useState<Record<string, string>>({});
-  const [toolAccessByUser, setToolAccessByUser] = useState<Record<string, ToolFlags>>({});
-  const [premiumToolsByUser, setPremiumToolsByUser] = useState<Record<string, ToolFlags>>({});
 
   const [searchField, setSearchField] = useState<AdminSearchField>('all');
   const [searchInput, setSearchInput] = useState('');
@@ -98,26 +129,11 @@ export default function AdminUserAccessPage({
       (import.meta.env.DEV ? 'http://localhost:4242' : ''),
     []
   );
+
   const companyById = useMemo(
     () => new Map(companies.map((company) => [company.id, company])),
     [companies]
   );
-
-  const getCompanyLabel = (companyId: string | null | undefined) => {
-    if (!companyId) return 'Sin empresa';
-    return companyById.get(companyId)?.name || 'Empresa no encontrada';
-  };
-
-  const getCompanyLogoAlt = (company: AdminCompany) =>
-    company.logoAlt || company.name || 'Logo de empresa';
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setSearchQuery(searchInput.trim());
-    }, 250);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchInput]);
 
   const listParams = useMemo<ListAdminUsersParams>(
     () => ({
@@ -132,17 +148,26 @@ export default function AdminUserAccessPage({
   const hasActiveFilters =
     Boolean(searchQuery) || searchField !== 'all' || premiumStatusFilter !== 'all';
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  const getIdToken = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error('No hay sesion activa.');
+    return currentUser.getIdToken(true);
+  };
+
   const loadCompanies = useCallback(async () => {
     setIsLoadingCompanies(true);
     setError(null);
 
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('No hay sesion activa.');
-      }
-
-      const token = await currentUser.getIdToken(true);
+      const token = await getIdToken();
       const data = await listAdminCompanies(apiBaseUrl, token);
       setCompanies(data.companies);
     } catch (err: any) {
@@ -151,73 +176,6 @@ export default function AdminUserAccessPage({
       setIsLoadingCompanies(false);
     }
   }, [apiBaseUrl]);
-
-  const formatDate = (value: string | null): string => {
-    if (!value) return '—';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '—';
-    return parsed.toLocaleString('es-MX');
-  };
-
-  const getInitials = (user: AdminListedUser): string => {
-    const source = (user.displayName || user.email || '').trim();
-    if (!source) return 'U';
-
-    const chunks = source.split(/\s+/).filter(Boolean);
-    if (chunks.length >= 2) {
-      return `${chunks[0][0]}${chunks[1][0]}`.toUpperCase();
-    }
-    return source.slice(0, 2).toUpperCase();
-  };
-
-  const summarizeTools = (flags: ToolFlags) => {
-    const selected = PLATFORM_TOOLS.filter((tool) => flags[tool.id]);
-    if (selected.length === PLATFORM_TOOLS.length) return 'Todas';
-    if (selected.length === 0) return 'Ninguna';
-    return selected.map((tool) => tool.label).join(', ');
-  };
-
-  const toggleToolFlag = (flags: ToolFlags, toolId: ToolId): ToolFlags => ({
-    ...flags,
-    [toolId]: !flags[toolId],
-  });
-
-  const updateRowFromResult = (targetEmail: string, result: ManageUserAccessResult) => {
-    setUsers((previous) =>
-      previous.map((item) => {
-        if (item.email !== targetEmail.toLowerCase()) return item;
-
-        const expirationMs = result.expiresAt ? new Date(result.expiresAt).getTime() : null;
-        const premiumActive =
-          result.premium && (result.unlimited || (expirationMs != null && expirationMs > Date.now()));
-
-        return {
-          ...item,
-          displayName: result.displayName || item.displayName,
-          premium: result.premium,
-          premiumActive,
-          premiumUnlimited: result.premium && result.unlimited,
-          premiumExpiresAt: result.premium ? result.expiresAt : null,
-          premiumGrantedAt:
-            result.premium
-              ? result.premiumGrantedAt || item.premiumGrantedAt || new Date().toISOString()
-              : null,
-          toolAccess: normalizeToolFlags(result.toolAccess, true),
-          premiumTools: normalizeToolFlags(result.premiumTools, true),
-          companyId: result.companyId,
-        };
-      })
-    );
-
-    setToolAccessByUser((previous) => ({
-      ...previous,
-      [result.uid]: normalizeToolFlags(result.toolAccess, true),
-    }));
-    setPremiumToolsByUser((previous) => ({
-      ...previous,
-      [result.uid]: normalizeToolFlags(result.premiumTools, true),
-    }));
-  };
 
   const loadUsers = useCallback(
     async (
@@ -239,18 +197,12 @@ export default function AdminUserAccessPage({
       const requestId = ++requestSeqRef.current;
 
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          throw new Error('No hay sesion activa.');
-        }
-
-        const token = await currentUser.getIdToken(true);
+        const token = await getIdToken();
         const params: ListAdminUsersParams = {
           ...(paramsOverride || listParams),
           pageToken,
           pageSize: 30,
         };
-
         const data = await listAdminUsers(apiBaseUrl, token, params);
 
         if (requestId !== requestSeqRef.current) return;
@@ -263,29 +215,6 @@ export default function AdminUserAccessPage({
           data.users.forEach((item) => byUid.set(item.uid, item));
           return Array.from(byUid.values());
         });
-
-        setMonthsByUser((previous) => {
-          const next = { ...previous };
-          data.users.forEach((item) => {
-            if (next[item.uid] == null) next[item.uid] = '6';
-          });
-          return next;
-        });
-        setToolAccessByUser((previous) => {
-          const next = append ? { ...previous } : {};
-          data.users.forEach((item) => {
-            next[item.uid] = normalizeToolFlags(item.toolAccess, true);
-          });
-          return next;
-        });
-        setPremiumToolsByUser((previous) => {
-          const next = append ? { ...previous } : {};
-          data.users.forEach((item) => {
-            next[item.uid] = normalizeToolFlags(item.premiumTools, true);
-          });
-          return next;
-        });
-
         setNextPageToken(data.nextPageToken);
       } catch (err: any) {
         if (requestId !== requestSeqRef.current) return;
@@ -313,7 +242,7 @@ export default function AdminUserAccessPage({
 
   useEffect(() => {
     const target = infiniteLoaderRef.current;
-    if (!target || !nextPageToken || isLoadingList || isLoadingMore) return;
+    if (!target || !nextPageToken || isLoadingList || isLoadingMore || activeTab !== 'users') return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -331,31 +260,191 @@ export default function AdminUserAccessPage({
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [loadUsers, listParams, nextPageToken, isLoadingList, isLoadingMore]);
+  }, [activeTab, loadUsers, listParams, nextPageToken, isLoadingList, isLoadingMore]);
 
-  const handleMonthsChange = (uid: string, rawValue: string) => {
-    const onlyDigits = rawValue.replace(/\D/g, '');
-    if (!onlyDigits) {
-      setMonthsByUser((previous) => ({ ...previous, [uid]: '' }));
-      return;
-    }
-
-    const normalized = onlyDigits.replace(/^0+(?=\d)/, '');
-    setMonthsByUser((previous) => ({ ...previous, [uid]: normalized }));
+  const updateCreateForm = <K extends keyof UserEditorForm>(key: K, value: UserEditorForm[K]) => {
+    setCreateForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleNewUserMonthsChange = (rawValue: string) => {
-    const onlyDigits = rawValue.replace(/\D/g, '');
-    if (!onlyDigits) {
-      setNewUserMonthsInput('');
-      return;
-    }
-    const normalized = onlyDigits.replace(/^0+(?=\d)/, '');
-    setNewUserMonthsInput(normalized);
+  const updateEditForm = <K extends keyof UserEditorForm>(key: K, value: UserEditorForm[K]) => {
+    setEditForm((current) => ({ ...current, [key]: value }));
   };
 
-  const updateCompanyForm = (key: keyof typeof companyForm, value: string) => {
+  const updateCompanyForm = <K extends keyof CompanyForm>(key: K, value: CompanyForm[K]) => {
     setCompanyForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const normalizeMonthInput = (rawValue: string) => {
+    const onlyDigits = rawValue.replace(/\D/g, '');
+    if (!onlyDigits) return '';
+    return onlyDigits.replace(/^0+(?=\d)/, '');
+  };
+
+  const toggleToolFlag = (flags: ToolFlags, toolId: ToolId): ToolFlags => ({
+    ...flags,
+    [toolId]: !flags[toolId],
+  });
+
+  const formatDate = (value: string | null): string => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleString(locale);
+  };
+
+  const getCompanyLabel = (companyId: string | null | undefined) => {
+    if (!companyId) return 'Sin empresa';
+    return companyById.get(companyId)?.name || 'Empresa no encontrada';
+  };
+
+  const getCompanyLogoAlt = (company: AdminCompany) =>
+    company.logoAlt || company.name || 'Logo de empresa';
+
+  const getInitials = (user: AdminListedUser): string => {
+    const source = (user.displayName || user.email || '').trim();
+    if (!source) return 'U';
+
+    const chunks = source.split(/\s+/).filter(Boolean);
+    if (chunks.length >= 2) return `${chunks[0][0]}${chunks[1][0]}`.toUpperCase();
+    return source.slice(0, 2).toUpperCase();
+  };
+
+  const summarizeTools = (flags: ToolFlags) => {
+    const selected = PLATFORM_TOOLS.filter((tool) => flags[tool.id]);
+    if (selected.length === PLATFORM_TOOLS.length) return 'Todas';
+    if (selected.length === 0) return 'Ninguna';
+    return selected.map((tool) => tool.label).join(', ');
+  };
+
+  const getPremiumState = (user: AdminListedUser) => {
+    if (user.premiumActive && user.premiumUnlimited) {
+      return {
+        label: 'VIP ilimitado',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      };
+    }
+
+    if (user.premiumActive) {
+      return {
+        label: 'Activo',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      };
+    }
+
+    if (user.premium && user.premiumExpiresAt) {
+      return {
+        label: 'Expirado',
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
+      };
+    }
+
+    return {
+      label: 'Sin acceso',
+      className: 'bg-slate-50 text-slate-700 border-slate-200',
+    };
+  };
+
+  const validateUserForm = (form: UserEditorForm) => {
+    const email = form.email.trim().toLowerCase();
+    const displayName = form.displayName.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const months = Number(form.monthsInput);
+
+    if (!email || !emailRegex.test(email)) {
+      return { errorMessage: 'Ingresa un correo valido.', email, displayName, months };
+    }
+
+    if (displayName.length > 120) {
+      return { errorMessage: 'El nombre visible no puede exceder 120 caracteres.', email, displayName, months };
+    }
+
+    if (form.accessMode === 'months' && (!Number.isInteger(months) || months <= 0)) {
+      return { errorMessage: 'Los meses deben ser un numero entero mayor a 0.', email, displayName, months };
+    }
+
+    return { errorMessage: null, email, displayName, months };
+  };
+
+  const buildUserPayload = (
+    form: UserEditorForm,
+    options: { uid?: string; createOnly?: boolean }
+  ): ManageUserAccessPayload | null => {
+    const validation = validateUserForm(form);
+    if (validation.errorMessage) {
+      setError(validation.errorMessage);
+      return null;
+    }
+
+    return {
+      ...options,
+      email: validation.email,
+      displayName: validation.displayName,
+      createOnly: options.createOnly,
+      premium: form.accessMode !== 'none',
+      unlimited: form.accessMode === 'vip',
+      months: form.accessMode === 'months' ? validation.months : undefined,
+      monthAction: form.accessMode === 'months' ? 'set' : undefined,
+      companyId: form.companyId,
+      toolAccess: form.toolAccess,
+      premiumTools: form.premiumTools,
+    };
+  };
+
+  const updateRowFromResult = (result: ManageUserAccessResult) => {
+    setUsers((previous) =>
+      previous.map((item) => {
+        if (item.uid !== result.uid) return item;
+
+        const expirationMs = result.expiresAt ? new Date(result.expiresAt).getTime() : null;
+        const premiumActive =
+          result.premium && (result.unlimited || (expirationMs != null && expirationMs > Date.now()));
+
+        return {
+          ...item,
+          email: result.email,
+          displayName: result.displayName,
+          premium: result.premium,
+          premiumActive,
+          premiumUnlimited: result.premium && result.unlimited,
+          premiumExpiresAt: result.premium ? result.expiresAt : null,
+          premiumGrantedAt:
+            result.premium
+              ? result.premiumGrantedAt || item.premiumGrantedAt || new Date().toISOString()
+              : null,
+          toolAccess: normalizeToolFlags(result.toolAccess, true),
+          premiumTools: normalizeToolFlags(result.premiumTools, true),
+          companyId: result.companyId,
+        };
+      })
+    );
+  };
+
+  const handleCreateUser = async () => {
+    const payload = buildUserPayload(createForm, { createOnly: true });
+    if (!payload) return;
+
+    setIsCreatingUser(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const token = await getIdToken();
+      const result = await manageUserAccess(apiBaseUrl, token, payload);
+      await loadUsers(false, null, listParams);
+
+      setCreateForm(emptyUserForm());
+      setActiveTab('users');
+      setSuccess(`Usuario creado: ${result.email}.`);
+    } catch (err: any) {
+      const message = err?.message || '';
+      setError(
+        message.includes('User already exists')
+          ? 'Ese usuario ya existe. Usa Editar usuario desde la tabla.'
+          : message || 'No se pudo crear el usuario.'
+      );
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const handleCreateCompany = async () => {
@@ -373,12 +462,7 @@ export default function AdminUserAccessPage({
     setSuccess(null);
 
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('No hay sesión activa.');
-      }
-
-      const token = await currentUser.getIdToken(true);
+      const token = await getIdToken();
       const result = await createAdminCompany(apiBaseUrl, token, {
         name: normalizedName,
         logoUrl: normalizedLogoUrl || null,
@@ -389,16 +473,9 @@ export default function AdminUserAccessPage({
       });
 
       setCompanies((current) =>
-        [...current, result.company].sort((a, b) => a.name.localeCompare(b.name, 'es-MX'))
+        [...current, result.company].sort((a, b) => a.name.localeCompare(b.name, locale))
       );
-      setCompanyForm({
-        name: '',
-        logoUrl: '',
-        logoAlt: '',
-        primaryColor: '#2476ff',
-        headerColor: '#0e1628',
-        logoBackgroundColor: '#ffffff',
-      });
+      setCompanyForm(emptyCompanyForm());
       setSuccess(`Empresa creada: ${result.company.name}.`);
     } catch (err: any) {
       setError(err?.message || 'No se pudo crear la empresa.');
@@ -407,153 +484,682 @@ export default function AdminUserAccessPage({
     }
   };
 
-  const handleCreateUser = async () => {
-    const normalizedEmail = newUserEmail.trim().toLowerCase();
-    const normalizedDisplayName = newUserDisplayName.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
-      setError('Ingresa un correo válido para crear el usuario.');
-      return;
-    }
-
-    if (normalizedDisplayName.length > 120) {
-      setError('El nombre opcional no puede exceder 120 caracteres.');
-      return;
-    }
-
-    const months = Number(newUserMonthsInput);
-    if (newUserAccessMode === 'months' && (!Number.isInteger(months) || months <= 0)) {
-      setError('Los meses deben ser un número entero mayor a 0.');
-      return;
-    }
-
-    setIsCreatingUser(true);
+  const openEditUserModal = (user: AdminListedUser) => {
+    setEditingUser(user);
+    setEditForm({
+      email: user.email || '',
+      displayName: user.displayName || '',
+      accessMode: user.premium ? (user.premiumUnlimited ? 'vip' : 'months') : 'none',
+      monthsInput: '6',
+      companyId: user.companyId || null,
+      toolAccess: normalizeToolFlags(user.toolAccess, true),
+      premiumTools: normalizeToolFlags(user.premiumTools, true),
+    });
     setError(null);
     setSuccess(null);
-
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('No hay sesión activa.');
-      }
-
-      const token = await currentUser.getIdToken(true);
-      const payload: ManageUserAccessPayload = {
-        email: normalizedEmail,
-        displayName: normalizedDisplayName || undefined,
-        premium: newUserAccessMode !== 'none',
-        unlimited: newUserAccessMode === 'vip',
-        months: newUserAccessMode === 'months' ? months : undefined,
-        monthAction: newUserAccessMode === 'months' ? 'set' : undefined,
-        toolAccess: newUserToolAccess,
-        premiumTools: newUserPremiumTools,
-        companyId: newUserCompanyId,
-      };
-
-      const result = await manageUserAccess(apiBaseUrl, token, payload);
-      await loadUsers(false, null, listParams);
-
-      setSuccess(
-        result.created
-          ? `Usuario creado: ${result.email}`
-          : `Usuario actualizado: ${result.email}`
-      );
-
-      setNewUserEmail('');
-      setNewUserDisplayName('');
-      setNewUserAccessMode('months');
-      setNewUserMonthsInput('6');
-      setNewUserToolAccess(buildDefaultToolFlags(true));
-      setNewUserPremiumTools(buildDefaultToolFlags(true));
-      setNewUserCompanyId(null);
-    } catch (err: any) {
-      setError(err?.message || 'No se pudo crear/actualizar el usuario.');
-    } finally {
-      setIsCreatingUser(false);
-    }
   };
 
-  const applyActionToUser = async (
-    user: AdminListedUser,
-    payload: {
-      premium?: boolean;
-      unlimited?: boolean;
-      months?: number;
-      monthAction?: AdminPremiumMonthAction;
-      toolAccess?: ToolFlags;
-      premiumTools?: ToolFlags;
-      companyId?: string | null;
-    },
-    actionLabel: string
-  ) => {
-    if (!user.email) {
-      setError('No se puede aplicar cambios a un usuario sin correo.');
-      return;
-    }
+  const closeEditUserModal = () => {
+    setEditingUser(null);
+    setEditForm(emptyUserForm());
+    setIsSavingEdit(false);
+  };
 
-    const actionKey = `${user.uid}:${actionLabel}`;
-    setActiveActionKey(actionKey);
+  const handleSaveEditedUser = async () => {
+    if (!editingUser) return;
+
+    const payload = buildUserPayload(editForm, { uid: editingUser.uid });
+    if (!payload) return;
+
+    setIsSavingEdit(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('No hay sesion activa.');
-      }
-
-      const token = await currentUser.getIdToken(true);
-      const result = await manageUserAccess(apiBaseUrl, token, {
-        email: user.email,
-        ...payload,
-      });
-
-      updateRowFromResult(user.email, result);
-      setSuccess(`Cambios aplicados para ${user.email}.`);
+      const token = await getIdToken();
+      const result = await manageUserAccess(apiBaseUrl, token, payload);
+      updateRowFromResult(result);
+      closeEditUserModal();
+      setSuccess(`Usuario actualizado: ${result.email}.`);
     } catch (err: any) {
       setError(err?.message || 'No se pudo actualizar el usuario.');
     } finally {
-      setActiveActionKey(null);
+      setIsSavingEdit(false);
     }
   };
 
-  const applyToolSettingsToUser = async (user: AdminListedUser) => {
-    await applyActionToUser(
-      user,
-      {
-        toolAccess: toolAccessByUser[user.uid] || normalizeToolFlags(user.toolAccess, true),
-        premiumTools: premiumToolsByUser[user.uid] || normalizeToolFlags(user.premiumTools, true),
-      },
-      'tools'
+  const renderToolCheckboxes = (
+    flags: ToolFlags,
+    onChange: (next: ToolFlags) => void
+  ) => (
+    <div className="flex flex-wrap gap-2">
+      {PLATFORM_TOOLS.map((tool) => (
+        <label
+          key={tool.id}
+          className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-white"
+        >
+          <input
+            type="checkbox"
+            checked={flags[tool.id]}
+            onChange={() => onChange(toggleToolFlag(flags, tool.id))}
+            className="accent-indigo-600"
+          />
+          {tool.label}
+        </label>
+      ))}
+    </div>
+  );
+
+  const renderCompanySelect = (
+    companyId: string | null,
+    onChange: (companyId: string | null) => void
+  ) => {
+    const selectedCompany = companyId ? companyById.get(companyId) : null;
+
+    return (
+      <div className="space-y-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-600">Empresa</span>
+          <select
+            value={companyId || ''}
+            onChange={(event) => onChange(event.target.value || null)}
+            className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <option value="">Sin empresa</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden bg-white shrink-0"
+            style={selectedCompany ? { backgroundColor: selectedCompany.logoBackgroundColor } : undefined}
+          >
+            {selectedCompany?.logoUrl ? (
+              <img
+                src={selectedCompany.logoUrl}
+                alt={getCompanyLogoAlt(selectedCompany)}
+                className="w-full h-full object-contain p-1"
+              />
+            ) : (
+              <Building2 className="w-5 h-5 text-slate-400" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 truncate">
+              {getCompanyLabel(companyId)}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {selectedCompany ? 'Marca aplicada al iniciar sesion.' : 'Usara el diseno default.'}
+            </p>
+          </div>
+        </div>
+      </div>
     );
   };
 
-  const handleSelectCompanyFromModal = async (companyId: string | null) => {
-    if (!companyModalTarget) return;
+  const renderUserFormFields = (
+    form: UserEditorForm,
+    updateForm: <K extends keyof UserEditorForm>(key: K, value: UserEditorForm[K]) => void,
+    mode: 'create' | 'edit'
+  ) => (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-600">Correo</span>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(event) => updateForm('email', event.target.value)}
+            placeholder="usuario@dominio.com"
+            className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-slate-600">Nombre visible</span>
+          <input
+            type="text"
+            value={form.displayName}
+            onChange={(event) => updateForm('displayName', event.target.value)}
+            placeholder="Nombre del usuario"
+            className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+        </label>
+      </div>
 
-    if (companyModalTarget.type === 'new') {
-      setNewUserCompanyId(companyId);
-      setCompanyModalTarget(null);
-      return;
-    }
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-4 items-start">
+        {renderCompanySelect(form.companyId, (nextCompanyId) => updateForm('companyId', nextCompanyId))}
 
-    const targetUser = companyModalTarget.user;
-    await applyActionToUser(
-      targetUser,
-      { companyId },
-      'company'
+        <div className="grid grid-cols-1 gap-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-slate-600">Estado premium</span>
+            <select
+              value={form.accessMode}
+              onChange={(event) => updateForm('accessMode', event.target.value as AccessMode)}
+              className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              <option value="months">Premium con vencimiento</option>
+              <option value="vip">VIP ilimitado</option>
+              <option value="none">Sin premium</option>
+            </select>
+          </label>
+
+          {form.accessMode === 'months' && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-slate-600">
+                {mode === 'edit' ? 'Meses desde hoy' : 'Meses iniciales'}
+              </span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={form.monthsInput}
+                onChange={(event) => updateForm('monthsInput', normalizeMonthInput(event.target.value))}
+                className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </label>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+          <div className="flex items-start gap-2 mb-3">
+            <KeyRound className="w-4 h-4 text-indigo-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Herramientas disponibles</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Controla que herramientas puede abrir.
+              </p>
+            </div>
+          </div>
+          {renderToolCheckboxes(form.toolAccess, (next) => updateForm('toolAccess', next))}
+        </div>
+
+        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+          <div className="flex items-start gap-2 mb-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Beneficio premium</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Solo aplica si el usuario tiene premium activo.
+              </p>
+            </div>
+          </div>
+          {renderToolCheckboxes(form.premiumTools, (next) => updateForm('premiumTools', next))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAdminTabs = () => {
+    const tabs: Array<{ id: AdminTab; label: string; icon: typeof Users }> = [
+      { id: 'users', label: 'Usuarios', icon: Users },
+      { id: 'create', label: 'Crear usuario', icon: UserPlus },
+      { id: 'companies', label: 'Empresas', icon: Building2 },
+    ];
+
+    return (
+      <div className="border-b border-slate-200">
+        <div className="flex flex-wrap gap-2 p-3">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border transition-colors ${
+                  isActive
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
-    setCompanyModalTarget(null);
   };
 
-  const selectedModalCompanyId =
-    companyModalTarget?.type === 'new'
-      ? newUserCompanyId
-      : companyModalTarget?.user.companyId || null;
-  const isCompanyModalApplying =
-    companyModalTarget?.type === 'existing' &&
-    activeActionKey?.startsWith(`${companyModalTarget.user.uid}:`) === true;
+  const renderUsersTab = () => (
+    <div className="space-y-5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Usuarios</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Consulta usuarios y edita su perfil, empresa, permisos y premium desde un solo modal.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('create')}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-4 py-2.5 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo usuario
+          </button>
+          <button
+            type="button"
+            onClick={() => loadUsers(false, null, listParams)}
+            disabled={isLoadingList}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingList ? 'animate-spin' : ''}`} />
+            Recargar
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)] gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-slate-600">Filtrar por</span>
+          <select
+            value={searchField}
+            onChange={(event) => setSearchField(event.target.value as AdminSearchField)}
+            className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <option value="all">Correo o nombre</option>
+            <option value="email">Solo correo</option>
+            <option value="displayName">Solo nombre</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-slate-600">Estado premium</span>
+          <select
+            value={premiumStatusFilter}
+            onChange={(event) => setPremiumStatusFilter(event.target.value as AdminPremiumStatusFilter)}
+            className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            <option value="all">Todos</option>
+            <option value="active">Activo</option>
+            <option value="expired">Expirado</option>
+            <option value="vip">VIP ilimitado</option>
+            <option value="noAccess">Sin acceso</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-slate-600">Busqueda rapida</span>
+          <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300">
+            <Search className="w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="correo@dominio.com o nombre"
+              className="w-full bg-transparent outline-none text-sm"
+            />
+          </div>
+        </label>
+      </div>
+
+      {isLoadingList ? (
+        <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
+          Cargando usuarios...
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+          <table className="min-w-[1120px] w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-slate-700">
+                <th className="px-4 py-3 font-semibold">Usuario</th>
+                <th className="px-4 py-3 font-semibold">Empresa</th>
+                <th className="px-4 py-3 font-semibold">Premium</th>
+                <th className="px-4 py-3 font-semibold">Herramientas</th>
+                <th className="px-4 py-3 font-semibold">Fechas</th>
+                <th className="px-4 py-3 font-semibold text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => {
+                const assignedCompany = user.companyId ? companyById.get(user.companyId) : null;
+                const state = getPremiumState(user);
+
+                return (
+                  <tr key={user.uid} className="border-b border-slate-100 align-top">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt={user.displayName || user.email || 'Avatar'}
+                            className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center font-semibold">
+                            {getInitials(user)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {user.displayName || 'Sin nombre'}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">{user.email || 'Sin correo'}</p>
+                          <p className="text-[11px] text-slate-400 truncate">UID: {user.uid}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 bg-slate-100"
+                          style={assignedCompany ? { backgroundColor: assignedCompany.logoBackgroundColor } : undefined}
+                        >
+                          {assignedCompany?.logoUrl ? (
+                            <img
+                              src={assignedCompany.logoUrl}
+                              alt={getCompanyLogoAlt(assignedCompany)}
+                              className="w-full h-full object-contain p-1"
+                            />
+                          ) : (
+                            <Building2 className="w-4 h-4 text-slate-500" />
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate">
+                            {getCompanyLabel(user.companyId)}
+                          </p>
+                          {user.companyId && !assignedCompany && (
+                            <p className="text-xs text-amber-600">No encontrada</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2.5 py-1 rounded-lg border text-xs font-medium ${state.className}`}>
+                        {state.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600 space-y-1">
+                      <p>
+                        <span className="font-semibold text-slate-700">Acceso:</span> {summarizeTools(user.toolAccess)}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-700">Premium:</span> {summarizeTools(user.premiumTools)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600 space-y-1">
+                      <p>
+                        <span className="font-semibold text-slate-700">Alta:</span> {formatDate(user.createdAt)}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-700">Vence:</span> {formatDate(user.premiumExpiresAt)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        disabled={!user.email}
+                        onClick={() => openEditUserModal(user)}
+                        className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl px-4 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Editar usuario
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                    {hasActiveFilters
+                      ? 'No se encontraron usuarios con ese filtro.'
+                      : 'No hay usuarios para mostrar.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-slate-500">
+          Carga progresiva activa: 30 usuarios por bloque con scroll automatico.
+        </p>
+        {nextPageToken && (
+          <button
+            type="button"
+            onClick={() => loadUsers(true, nextPageToken, listParams)}
+            disabled={isLoadingMore}
+            className="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg px-3 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isLoadingMore ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Cargando...
+              </>
+            ) : (
+              'Cargar mas usuarios'
+            )}
+          </button>
+        )}
+      </div>
+
+      <div ref={infiniteLoaderRef} className="h-2" aria-hidden="true" />
+    </div>
+  );
+
+  const renderCreateUserTab = () => (
+    <div className="space-y-5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Crear usuario</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Alta manual de usuarios con empresa, permisos y premium inicial.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCreateForm(emptyUserForm())}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-4 py-2.5 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Limpiar
+        </button>
+      </div>
+
+      {renderUserFormFields(createForm, updateCreateForm, 'create')}
+
+      <div className="border-t border-slate-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-xs text-slate-500">
+          Si el correo ya existe, usa la accion Editar usuario desde la tabla.
+        </p>
+        <button
+          type="button"
+          onClick={handleCreateUser}
+          disabled={isCreatingUser}
+          className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <Save className="w-4 h-4" />
+          {isCreatingUser ? 'Creando...' : 'Crear usuario'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCompaniesTab = () => (
+    <div className="p-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Empresas</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Configuraciones de marca disponibles para asignar a usuarios.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadCompanies}
+            disabled={isLoadingCompanies}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingCompanies ? 'animate-spin' : ''}`} />
+            Recargar
+          </button>
+        </div>
+
+        {isLoadingCompanies ? (
+          <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
+            Cargando empresas...
+          </div>
+        ) : companies.length === 0 ? (
+          <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+            Todavia no hay empresas registradas.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {companies.map((company) => (
+              <div key={company.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-14 h-14 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
+                    style={{ backgroundColor: company.logoBackgroundColor }}
+                  >
+                    {company.logoUrl ? (
+                      <img
+                        src={company.logoUrl}
+                        alt={getCompanyLogoAlt(company)}
+                        className="w-full h-full object-contain p-1"
+                      />
+                    ) : (
+                      <Building2 className="w-6 h-6 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{company.name}</p>
+                    <p className="text-xs text-slate-500 truncate">ID: {company.id}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        <span
+                          className="w-3 h-3 rounded-full border border-slate-300"
+                          style={{ backgroundColor: company.primaryColor }}
+                        />
+                        Primario
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        <span
+                          className="w-3 h-3 rounded-full border border-slate-300"
+                          style={{ backgroundColor: company.headerColor }}
+                        />
+                        Header
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+        <div className="flex items-start gap-2">
+          <Palette className="w-4 h-4 text-indigo-600 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Crear empresa</p>
+            <p className="text-xs text-slate-500 mt-1">
+              El logo se guarda como URL publica; los colores se aplican al usuario asignado.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-slate-600">Nombre</span>
+            <input
+              type="text"
+              value={companyForm.name}
+              onChange={(event) => updateCompanyForm('name', event.target.value)}
+              placeholder="Nombre de la empresa"
+              className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-slate-600">URL del logo</span>
+            <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
+              <Image className="w-4 h-4 text-slate-400" />
+              <input
+                type="url"
+                value={companyForm.logoUrl}
+                onChange={(event) => updateCompanyForm('logoUrl', event.target.value)}
+                placeholder="https://..."
+                className="w-full bg-transparent outline-none text-sm"
+              />
+            </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-slate-600">Texto alternativo del logo</span>
+            <input
+              type="text"
+              value={companyForm.logoAlt}
+              onChange={(event) => updateCompanyForm('logoAlt', event.target.value)}
+              placeholder="Opcional"
+              className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-slate-600">Primario</span>
+              <input
+                type="color"
+                value={companyForm.primaryColor}
+                onChange={(event) => updateCompanyForm('primaryColor', event.target.value)}
+                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-slate-600">Header</span>
+              <input
+                type="color"
+                value={companyForm.headerColor}
+                onChange={(event) => updateCompanyForm('headerColor', event.target.value)}
+                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-slate-600">Fondo logo</span>
+              <input
+                type="color"
+                value={companyForm.logoBackgroundColor}
+                onChange={(event) => updateCompanyForm('logoBackgroundColor', event.target.value)}
+                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreateCompany}
+            disabled={isCreatingCompany}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {isCreatingCompany ? 'Creando empresa...' : 'Crear empresa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen app-shell font-sans">
@@ -567,21 +1173,12 @@ export default function AdminUserAccessPage({
               <ShieldCheck className="w-4 h-4" />
               Acceso administrativo restringido
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 mt-3">Administración de usuarios</h1>
-            <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
+            <h1 className="text-2xl font-bold text-slate-800 mt-3">Administracion</h1>
+            <p className="text-sm text-slate-600 mt-1">Sesion autorizada: {adminEmail}</p>
           </div>
         }
         right={
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => loadUsers(false, null, listParams)}
-              disabled={isLoadingList}
-              className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingList ? 'animate-spin' : ''}`} />
-              Recargar
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={onBackHome}
@@ -595,806 +1192,61 @@ export default function AdminUserAccessPage({
               className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              Cerrar sesión
+              Cerrar sesion
             </button>
           </div>
         }
       />
 
-      <div className="max-w-7xl mx-auto space-y-5 p-4 md:p-8">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
-          <div className="border border-slate-200 rounded-2xl bg-slate-50">
-            <div className="p-5 border-b border-slate-200 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-base font-semibold text-slate-800">Empresas</h2>
-              </div>
-              <p className="text-sm text-slate-500">
-                Crea configuraciones de marca para asignarlas después a usuarios nuevos o existentes.
-              </p>
-            </div>
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          {renderAdminTabs()}
 
-            <div className="p-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5">
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Empresas registradas</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Estas opciones aparecen en el modal de asignación de empresa.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={loadCompanies}
-                    disabled={isLoadingCompanies}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCompanies ? 'animate-spin' : ''}`} />
-                    Recargar
-                  </button>
+          {(error || success) && (
+            <div className="p-5 pb-0 space-y-3">
+              {error && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {error}
                 </div>
-
-                {isLoadingCompanies ? (
-                  <div className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
-                    Cargando empresas...
-                  </div>
-                ) : companies.length === 0 ? (
-                  <div className="mt-4 text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
-                    Todavía no hay empresas registradas.
-                  </div>
-                ) : (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {companies.map((company) => (
-                      <div key={company.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-14 h-14 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
-                            style={{ backgroundColor: company.logoBackgroundColor }}
-                          >
-                            {company.logoUrl ? (
-                              <img
-                                src={company.logoUrl}
-                                alt={getCompanyLogoAlt(company)}
-                                className="w-full h-full object-contain p-1"
-                              />
-                            ) : (
-                              <Building2 className="w-6 h-6 text-slate-400" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-800 truncate">{company.name}</p>
-                            <p className="text-xs text-slate-500 truncate">ID: {company.id}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                                <span
-                                  className="w-3 h-3 rounded-full border border-slate-300"
-                                  style={{ backgroundColor: company.primaryColor }}
-                                />
-                                Primario
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                                <span
-                                  className="w-3 h-3 rounded-full border border-slate-300"
-                                  style={{ backgroundColor: company.headerColor }}
-                                />
-                                Header
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex items-start gap-2">
-                  <Palette className="w-4 h-4 text-indigo-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Crear empresa</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      El logo se guarda como URL pública; los colores se aplican al entrar con un usuario asignado.
-                    </p>
-                  </div>
+              )}
+              {success && (
+                <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                  {success}
                 </div>
-
-                <div className="mt-4 space-y-3">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-slate-600">Nombre</span>
-                    <input
-                      type="text"
-                      value={companyForm.name}
-                      onChange={(event) => updateCompanyForm('name', event.target.value)}
-                      placeholder="Nombre de la empresa"
-                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-slate-600">URL del logo</span>
-                    <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-indigo-300">
-                      <Image className="w-4 h-4 text-slate-400" />
-                      <input
-                        type="url"
-                        value={companyForm.logoUrl}
-                        onChange={(event) => updateCompanyForm('logoUrl', event.target.value)}
-                        placeholder="https://..."
-                        className="w-full bg-transparent outline-none text-sm"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-slate-600">Texto alternativo del logo</span>
-                    <input
-                      type="text"
-                      value={companyForm.logoAlt}
-                      onChange={(event) => updateCompanyForm('logoAlt', event.target.value)}
-                      placeholder="Opcional"
-                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    />
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium text-slate-600">Primario</span>
-                      <input
-                        type="color"
-                        value={companyForm.primaryColor}
-                        onChange={(event) => updateCompanyForm('primaryColor', event.target.value)}
-                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium text-slate-600">Header</span>
-                      <input
-                        type="color"
-                        value={companyForm.headerColor}
-                        onChange={(event) => updateCompanyForm('headerColor', event.target.value)}
-                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium text-slate-600">Fondo logo</span>
-                      <input
-                        type="color"
-                        value={companyForm.logoBackgroundColor}
-                        onChange={(event) => updateCompanyForm('logoBackgroundColor', event.target.value)}
-                        className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
-                      />
-                    </label>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleCreateCompany}
-                    disabled={isCreatingCompany}
-                    className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    {isCreatingCompany ? 'Creando empresa...' : 'Crear empresa'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border border-slate-200 rounded-2xl bg-slate-50">
-            <div className="p-5 border-b border-slate-200 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-base font-semibold text-slate-800">Crear o actualizar usuario</h2>
-              </div>
-              <p className="text-sm text-slate-500">
-                Define primero los datos, permisos y premium. Después guarda los cambios para ese usuario.
-              </p>
-            </div>
-
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate-600">Correo</span>
-                  <input
-                    type="email"
-                    value={newUserEmail}
-                    onChange={(event) => setNewUserEmail(event.target.value)}
-                    placeholder="usuario@dominio.com"
-                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate-600">Nombre visible (opcional)</span>
-                  <input
-                    type="text"
-                    value={newUserDisplayName}
-                    onChange={(event) => setNewUserDisplayName(event.target.value)}
-                    placeholder="Nombre del usuario"
-                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                </label>
-              </div>
-
-              <div className="border border-slate-200 rounded-xl p-4 bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Empresa asignada</p>
-                    <p className="text-sm text-slate-600 mt-1">{getCompanyLabel(newUserCompanyId)}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Si queda sin empresa, el usuario verá el diseño default.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCompanyModalTarget({ type: 'new' })}
-                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl px-4 py-2.5 transition-colors cursor-pointer"
-                >
-                  <Building2 className="w-4 h-4" />
-                  Escoger empresa
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-[260px_220px_minmax(0,1fr)] gap-4 items-start">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-slate-600">Estado premium inicial</span>
-                  <select
-                    value={newUserAccessMode}
-                    onChange={(event) =>
-                      setNewUserAccessMode(event.target.value as 'months' | 'vip' | 'none')
-                    }
-                    className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  >
-                    <option value="months">Premium con vencimiento</option>
-                    <option value="vip">VIP ilimitado</option>
-                    <option value="none">Sin premium</option>
-                  </select>
-                </label>
-
-                {newUserAccessMode === 'months' && (
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-slate-600">Meses desde hoy</span>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={newUserMonthsInput}
-                      onChange={(event) => handleNewUserMonthsChange(event.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    />
-                  </label>
-                )}
-
-                <div className="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
-                  Al crear o actualizar con premium por meses, la vigencia se ajusta exactamente desde hoy.
-                  Si eliges "Sin premium", los permisos de herramientas se conservan para cuando se active.
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <div className="border border-slate-200 rounded-xl p-4 bg-white">
-                  <div className="flex items-start gap-2">
-                    <KeyRound className="w-4 h-4 text-indigo-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">Herramientas disponibles</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Controla qué herramientas puede abrir. Todas vienen activas por default.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {PLATFORM_TOOLS.map((tool) => (
-                      <label
-                        key={tool.id}
-                        className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={newUserToolAccess[tool.id]}
-                          onChange={() => setNewUserToolAccess((current) => toggleToolFlag(current, tool.id))}
-                          className="accent-indigo-600"
-                        />
-                        {tool.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border border-slate-200 rounded-xl p-4 bg-white">
-                  <div className="flex items-start gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">Beneficio premium por herramienta</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Solo aplica si el usuario tiene premium activo. Todas vienen seleccionadas por default.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {PLATFORM_TOOLS.map((tool) => (
-                      <label
-                        key={tool.id}
-                        className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={newUserPremiumTools[tool.id]}
-                          onChange={() => setNewUserPremiumTools((current) => toggleToolFlag(current, tool.id))}
-                          className="accent-indigo-600"
-                        />
-                        {tool.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p className="text-xs text-slate-500">
-                  Úsalo también para actualizar permisos o premium de un usuario que ya existe.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleCreateUser}
-                  disabled={isCreatingUser}
-                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  {isCreatingUser ? 'Guardando...' : 'Crear / actualizar usuario'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-800">Gestión de usuarios y premium</h2>
-            <p className="text-sm text-slate-500">{users.length} resultados cargados</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)] gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-sm text-slate-600">Filtrar por</span>
-              <select
-                value={searchField}
-                onChange={(event) => setSearchField(event.target.value as AdminSearchField)}
-                className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                <option value="all">Correo o nombre de usuario</option>
-                <option value="email">Solo correo</option>
-                <option value="displayName">Solo nombre de usuario</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm text-slate-600">Estado premium</span>
-              <select
-                value={premiumStatusFilter}
-                onChange={(event) => setPremiumStatusFilter(event.target.value as AdminPremiumStatusFilter)}
-                className="border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                <option value="all">Todos</option>
-                <option value="active">Activo</option>
-                <option value="expired">Expirado</option>
-                <option value="vip">VIP ilimitado</option>
-                <option value="noAccess">Sin acceso</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm text-slate-600">Búsqueda rápida</span>
-              <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Ejemplo: correo@dominio.com o nombre de usuario"
-                  className="w-full bg-transparent outline-none text-sm"
-                />
-              </div>
-            </label>
-          </div>
-
-          {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
-          {success && (
-            <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-              {success}
+              )}
             </div>
           )}
 
-          {isLoadingList ? (
-            <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-4">
-              Cargando usuarios...
-            </div>
-          ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="min-w-[1760px] w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-left text-slate-700">
-                    <th className="px-4 py-3 font-semibold">Usuario</th>
-                    <th className="px-4 py-3 font-semibold">Correo</th>
-                    <th className="px-4 py-3 font-semibold">Empresa</th>
-                    <th className="px-4 py-3 font-semibold">Estado premium</th>
-                    <th className="px-4 py-3 font-semibold">Herramientas</th>
-                    <th className="px-4 py-3 font-semibold">Obtenido</th>
-                    <th className="px-4 py-3 font-semibold">Vence</th>
-                    <th className="px-4 py-3 font-semibold w-[660px]">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => {
-                    const monthsInput = monthsByUser[user.uid] ?? '6';
-                    const months = Number(monthsInput);
-                    const canApplyMonths = Number.isInteger(months) && months > 0;
-                    const isBusy = activeActionKey?.startsWith(`${user.uid}:`) === true;
-                    const toolAccess = toolAccessByUser[user.uid] || normalizeToolFlags(user.toolAccess, true);
-                    const premiumTools = premiumToolsByUser[user.uid] || normalizeToolFlags(user.premiumTools, true);
-                    const assignedCompany = user.companyId ? companyById.get(user.companyId) : null;
-
-                    const stateLabel = user.premiumActive
-                      ? user.premiumUnlimited
-                        ? 'Activo (VIP ilimitado)'
-                        : 'Activo'
-                      : user.premium && user.premiumExpiresAt
-                        ? 'Expirado'
-                        : 'Sin acceso';
-
-                    const stateStyle = user.premiumActive
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : user.premium && user.premiumExpiresAt
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-slate-50 text-slate-700 border-slate-200';
-
-                    return (
-                      <tr key={user.uid} className="border-b border-slate-100 align-top">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            {user.photoURL ? (
-                              <img
-                                src={user.photoURL}
-                                alt={user.displayName || user.email || 'Avatar'}
-                                className="w-10 h-10 rounded-full border border-slate-200 object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center font-semibold">
-                                {getInitials(user)}
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-medium text-slate-800 truncate">
-                                {user.displayName || 'Sin nombre'}
-                              </p>
-                              <p className="text-xs text-slate-500">UID: {user.uid}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {user.email ? (
-                            <span className="text-slate-700">{user.email}</span>
-                          ) : (
-                            <span className="text-slate-400">Sin correo</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              {assignedCompany?.logoUrl ? (
-                                <span
-                                  className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
-                                  style={{ backgroundColor: assignedCompany.logoBackgroundColor }}
-                                >
-                                  <img
-                                    src={assignedCompany.logoUrl}
-                                    alt={getCompanyLogoAlt(assignedCompany)}
-                                    className="w-full h-full object-contain p-1"
-                                  />
-                                </span>
-                              ) : (
-                                <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center shrink-0">
-                                  <Building2 className="w-4 h-4" />
-                                </span>
-                              )}
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-800 truncate">
-                                  {getCompanyLabel(user.companyId)}
-                                </p>
-                                {user.companyId && !assignedCompany && (
-                                  <p className="text-xs text-amber-600">Revisa si fue eliminada</p>
-                                )}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              disabled={!user.email || isBusy}
-                              onClick={() => setCompanyModalTarget({ type: 'existing', user })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                            >
-                              <Building2 className="w-3.5 h-3.5" />
-                              Escoger empresa
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2.5 py-1 rounded-lg border text-xs font-medium ${stateStyle}`}>
-                            {stateLabel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 space-y-1">
-                          <p>
-                            <span className="font-semibold text-slate-700">Acceso:</span> {summarizeTools(toolAccess)}
-                          </p>
-                          <p>
-                            <span className="font-semibold text-slate-700">Premium:</span> {summarizeTools(premiumTools)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">{formatDate(user.premiumGrantedAt)}</td>
-                        <td className="px-4 py-3 text-slate-700">{formatDate(user.premiumExpiresAt)}</td>
-                        <td className="px-4 py-3">
-                          <div className="space-y-3">
-                            <div className="border border-slate-200 rounded-xl p-3 bg-white">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-xs font-semibold text-slate-800">Permisos por herramienta</p>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    Acceso permite abrir la herramienta; Premium limita beneficios dentro de cada una.
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={!user.email || isBusy}
-                                  onClick={() => applyToolSettingsToUser(user)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                >
-                                  <Save className="w-3.5 h-3.5" />
-                                  Guardar permisos
-                                </button>
-                              </div>
-
-                              <div className="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-xs font-semibold text-slate-700 mb-2">Herramientas disponibles</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {PLATFORM_TOOLS.map((tool) => (
-                                      <label
-                                        key={tool.id}
-                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={toolAccess[tool.id]}
-                                          onChange={() =>
-                                            setToolAccessByUser((previous) => ({
-                                              ...previous,
-                                              [user.uid]: toggleToolFlag(toolAccess, tool.id),
-                                            }))
-                                          }
-                                          className="accent-indigo-600"
-                                        />
-                                        {tool.label}
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-xs font-semibold text-slate-700 mb-2">Beneficio premium</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {PLATFORM_TOOLS.map((tool) => (
-                                      <label
-                                        key={tool.id}
-                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={premiumTools[tool.id]}
-                                          onChange={() =>
-                                            setPremiumToolsByUser((previous) => ({
-                                              ...previous,
-                                              [user.uid]: toggleToolFlag(premiumTools, tool.id),
-                                            }))
-                                          }
-                                          className="accent-indigo-600"
-                                        />
-                                        {tool.label}
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="border border-indigo-100 rounded-xl p-3 bg-indigo-50/40">
-                              <div className="flex items-start gap-2">
-                                <CalendarClock className="w-4 h-4 text-indigo-700 mt-0.5" />
-                                <div>
-                                  <p className="text-xs font-semibold text-slate-800">Vigencia premium</p>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    Agregar extiende desde el vencimiento actual. Quitar descuenta del vencimiento actual.
-                                    Ajustar reinicia la vigencia desde hoy.
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 grid grid-cols-1 lg:grid-cols-[120px_minmax(0,1fr)] gap-3">
-                                <label className="flex flex-col gap-1">
-                                  <span className="text-xs font-semibold text-slate-600">Meses</span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    step={1}
-                                    value={monthsInput}
-                                    onChange={(event) => handleMonthsChange(user.uid, event.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                                  />
-                                </label>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                  <button
-                                    type="button"
-                                    disabled={!user.email || isBusy || !canApplyMonths}
-                                    onClick={() =>
-                                      applyActionToUser(
-                                        user,
-                                        {
-                                          premium: true,
-                                          unlimited: false,
-                                          months,
-                                          monthAction: 'add',
-                                          toolAccess,
-                                          premiumTools,
-                                        },
-                                        'add-months'
-                                      )
-                                    }
-                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                  >
-                                    Agregar meses
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={!user.email || isBusy || !canApplyMonths || !user.premiumExpiresAt}
-                                    onClick={() =>
-                                      applyActionToUser(
-                                        user,
-                                        {
-                                          premium: true,
-                                          unlimited: false,
-                                          months,
-                                          monthAction: 'subtract',
-                                          toolAccess,
-                                          premiumTools,
-                                        },
-                                        'subtract-months'
-                                      )
-                                    }
-                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-amber-300 text-amber-700 bg-white hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                  >
-                                    Quitar meses
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={!user.email || isBusy || !canApplyMonths}
-                                    onClick={() =>
-                                      applyActionToUser(
-                                        user,
-                                        {
-                                          premium: true,
-                                          unlimited: false,
-                                          months,
-                                          monthAction: 'set',
-                                          toolAccess,
-                                          premiumTools,
-                                        },
-                                        'set-months'
-                                      )
-                                    }
-                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                  >
-                                    Ajustar vencimiento
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  disabled={!user.email || isBusy}
-                                  onClick={() =>
-                                    applyActionToUser(
-                                      user,
-                                      { premium: true, unlimited: true, toolAccess, premiumTools },
-                                      'vip'
-                                    )
-                                  }
-                                  className="px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                >
-                                  Convertir a VIP ilimitado
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!user.email || isBusy}
-                                  onClick={() =>
-                                    applyActionToUser(
-                                      user,
-                                      { premium: false, unlimited: false, toolAccess, premiumTools },
-                                      'remove'
-                                    )
-                                  }
-                                  className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                                >
-                                  Quitar premium completo
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {users.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
-                        {hasActiveFilters
-                          ? 'No se encontraron usuarios con ese filtro.'
-                          : 'No hay usuarios para mostrar.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
-              Carga progresiva activa: 30 usuarios por bloque con scroll automático.
-            </p>
-            {nextPageToken && (
-              <button
-                type="button"
-                onClick={() => loadUsers(true, nextPageToken, listParams)}
-                disabled={isLoadingMore}
-                className="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg px-3 py-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-              >
-                {isLoadingMore ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Cargando...
-                  </>
-                ) : (
-                  'Cargar más usuarios'
-                )}
-              </button>
-            )}
-          </div>
-
-          <div ref={infiniteLoaderRef} className="h-2" aria-hidden="true" />
+          {activeTab === 'users' && renderUsersTab()}
+          {activeTab === 'create' && renderCreateUserTab()}
+          {activeTab === 'companies' && renderCompaniesTab()}
         </div>
       </div>
 
-      {companyModalTarget && (
+      {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            aria-label="Cerrar selector de empresa"
-            onClick={() => setCompanyModalTarget(null)}
+            aria-label="Cerrar editor de usuario"
+            onClick={closeEditUserModal}
             className="absolute inset-0 bg-slate-900/50 cursor-pointer"
           />
-          <div className="relative z-10 w-full max-w-4xl max-h-[88vh] overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-2xl">
+          <div className="relative z-10 w-full max-w-5xl max-h-[90vh] overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-2xl">
             <div className="p-5 border-b border-slate-200 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800">Escoger empresa</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  {companyModalTarget.type === 'new'
-                    ? 'Selecciona la empresa para el usuario que estás creando o actualizando.'
-                    : `Selecciona la empresa para ${companyModalTarget.user.email || 'este usuario'}.`}
-                </p>
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center shrink-0">
+                  <UserCog className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-slate-800">Editar usuario</h3>
+                  <p className="text-sm text-slate-500 mt-1 truncate">
+                    UID: {editingUser.uid}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setCompanyModalTarget(null)}
+                onClick={closeEditUserModal}
                 className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 cursor-pointer"
                 aria-label="Cerrar"
               >
@@ -1402,97 +1254,49 @@ export default function AdminUserAccessPage({
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto max-h-[calc(88vh-96px)] space-y-4">
-              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-white text-slate-500 border border-slate-200 flex items-center justify-center shrink-0">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Sin empresa</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Mantiene el logo, colores y diseño default de la plataforma.
-                    </p>
-                  </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-154px)]">
+              <div className="mb-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  <p className="text-xs font-semibold text-slate-500">Alta</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(editingUser.createdAt)}</p>
                 </div>
-                <button
-                  type="button"
-                  disabled={selectedModalCompanyId === null || isCompanyModalApplying}
-                  onClick={() => handleSelectCompanyFromModal(null)}
-                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                >
-                  {selectedModalCompanyId === null ? 'Seleccionado' : 'Usar default'}
-                </button>
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  <p className="text-xs font-semibold text-slate-500">Premium obtenido</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(editingUser.premiumGrantedAt)}</p>
+                </div>
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  <p className="text-xs font-semibold text-slate-500">Vencimiento actual</p>
+                  <p className="text-sm text-slate-800 mt-1">{formatDate(editingUser.premiumExpiresAt)}</p>
+                </div>
               </div>
 
-              {companies.length === 0 ? (
-                <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  No hay empresas disponibles. Crea una empresa primero desde el apartado de empresas.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {companies.map((company) => {
-                    const isSelected = selectedModalCompanyId === company.id;
+              <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <CalendarClock className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>
+                  Al guardar con premium por meses, la vigencia se ajusta desde hoy con el numero de meses indicado.
+                </p>
+              </div>
 
-                    return (
-                      <div key={company.id} className="border border-slate-200 rounded-xl p-4 bg-white">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-16 h-16 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
-                            style={{ backgroundColor: company.logoBackgroundColor }}
-                          >
-                            {company.logoUrl ? (
-                              <img
-                                src={company.logoUrl}
-                                alt={getCompanyLogoAlt(company)}
-                                className="w-full h-full object-contain p-1"
-                              />
-                            ) : (
-                              <Building2 className="w-7 h-7 text-slate-400" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-slate-800 truncate">{company.name}</p>
-                              {isSelected && (
-                                <span className="inline-flex px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                                  Seleccionada
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 truncate mt-1">ID: {company.id}</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1">
-                                <span
-                                  className="w-3 h-3 rounded-full border border-slate-300"
-                                  style={{ backgroundColor: company.primaryColor }}
-                                />
-                                Primario
-                              </span>
-                              <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1">
-                                <span
-                                  className="w-3 h-3 rounded-full border border-slate-300"
-                                  style={{ backgroundColor: company.headerColor }}
-                                />
-                                Header
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+              {renderUserFormFields(editForm, updateEditForm, 'edit')}
+            </div>
 
-                        <button
-                          type="button"
-                          disabled={isSelected || isCompanyModalApplying}
-                          onClick={() => handleSelectCompanyFromModal(company.id)}
-                          className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed enabled:cursor-pointer"
-                        >
-                          {isSelected ? 'Seleccionada' : 'Escoger esta empresa'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+            <div className="p-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <button
+                type="button"
+                onClick={closeEditUserModal}
+                className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-5 py-2.5 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditedUser}
+                disabled={isSavingEdit}
+                className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {isSavingEdit ? 'Guardando...' : 'Guardar cambios'}
+              </button>
             </div>
           </div>
         </div>

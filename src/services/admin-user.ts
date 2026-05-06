@@ -3,8 +3,10 @@ import type { ToolFlags } from '../config/tools';
 type AdminPremiumMonthAction = 'add' | 'subtract' | 'set';
 
 type ManageUserAccessPayload = {
+  uid?: string;
   email: string;
   displayName?: string;
+  createOnly?: boolean;
   premium?: boolean;
   unlimited?: boolean;
   months?: number;

@@ -222,6 +222,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const uidRaw = req.body?.uid;
   const emailRaw = req.body?.email;
   const displayNameRaw = req.body?.displayName;
   const premiumRaw = req.body?.premium;
@@ -232,10 +233,13 @@ module.exports = async function handler(req, res) {
   const hasToolAccessInput = req.body && typeof req.body.toolAccess === 'object' && req.body.toolAccess !== null;
   const hasPremiumToolsInput = req.body && typeof req.body.premiumTools === 'object' && req.body.premiumTools !== null;
   const hasCompanyInput = req.body && Object.prototype.hasOwnProperty.call(req.body, 'companyId');
+  const createOnly = req.body?.createOnly === true;
 
+  const uidInput = typeof uidRaw === 'string' ? uidRaw.trim() : '';
+  const hasUidInput = uidInput.length > 0;
   const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
   const displayName = typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
-  const hasDisplayName = displayName.length > 0;
+  const hasDisplayNameInput = req.body && Object.prototype.hasOwnProperty.call(req.body, 'displayName');
   const premium = hasPremiumChange ? premiumRaw : null;
   const unlimited = unlimitedRaw === true;
   const months = monthsRaw == null || monthsRaw === '' ? 6 : Number(monthsRaw);
@@ -253,7 +257,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!hasPremiumChange && !hasToolAccessInput && !hasPremiumToolsInput && !hasDisplayName && !hasCompanyInput) {
+  if (!hasPremiumChange && !hasToolAccessInput && !hasPremiumToolsInput && !hasDisplayNameInput && !hasCompanyInput && !hasUidInput) {
     res.status(400).json({ error: 'No changes were provided.' });
     return;
   }
@@ -291,12 +295,12 @@ module.exports = async function handler(req, res) {
     let userRecord;
     let created = false;
     try {
-      userRecord = await auth.getUserByEmail(email);
+      userRecord = hasUidInput ? await auth.getUser(uidInput) : await auth.getUserByEmail(email);
     } catch (err) {
-      if (err?.code === 'auth/user-not-found') {
+      if (!hasUidInput && err?.code === 'auth/user-not-found') {
         userRecord = await auth.createUser({
           email,
-          ...(hasDisplayName ? { displayName } : {}),
+          ...(hasDisplayNameInput && displayName ? { displayName } : {}),
         });
         created = true;
       } else {
@@ -304,9 +308,21 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    if (!hasUidInput && createOnly && !created) {
+      res.status(409).json({ error: 'User already exists. Use edit user instead.' });
+      return;
+    }
+
     const uid = userRecord.uid;
-    if (hasDisplayName && userRecord.displayName !== displayName) {
-      userRecord = await auth.updateUser(uid, { displayName });
+    const authUpdate = {};
+    if (userRecord.email?.toLowerCase() !== email) {
+      authUpdate.email = email;
+    }
+    if (hasDisplayNameInput && (userRecord.displayName || '') !== displayName) {
+      authUpdate.displayName = displayName || null;
+    }
+    if (Object.keys(authUpdate).length > 0) {
+      userRecord = await auth.updateUser(uid, authUpdate);
     }
 
     const userRef = db.collection('usuarios').doc(uid);
@@ -377,7 +393,7 @@ module.exports = async function handler(req, res) {
       await userRef.set({
         uid,
         email: userRecord.email || null,
-        displayName: hasDisplayName ? displayName : userRecord.displayName || null,
+        displayName: hasDisplayNameInput ? displayName || null : userRecord.displayName || null,
         photoURL: userRecord.photoURL || null,
         premium: nextPremium,
         premiumExpiresAt: premiumExpiresAtTimestamp,
@@ -401,9 +417,8 @@ module.exports = async function handler(req, res) {
         premiumTools: nextPremiumTools,
         updatedAt: serverNow,
       };
-      if (hasDisplayName) {
-        update.displayName = displayName;
-      }
+      update.email = userRecord.email || email;
+      if (hasDisplayNameInput) update.displayName = displayName || null;
       if (nextPremium && (hasPremiumChange || !existingData.premiumGrantedAt)) {
         update.premiumGrantedAt = serverNow;
       }
@@ -416,8 +431,8 @@ module.exports = async function handler(req, res) {
     res.status(200).json({
       ok: true,
       uid,
-      email,
-      displayName: hasDisplayName ? displayName : userRecord.displayName || null,
+      email: userRecord.email || email,
+      displayName: hasDisplayNameInput ? displayName || null : userRecord.displayName || null,
       created,
       premium: nextPremium,
       unlimited: nextPremium ? nextUnlimited : false,
