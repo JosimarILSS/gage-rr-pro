@@ -113,6 +113,29 @@ body,
   background: var(--app-bg);
 }
 
+:where(
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  select:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="color"]:not(:disabled),
+  label:has(input[type="file"]:not(:disabled)),
+  label:has(input[type="checkbox"]:not(:disabled)),
+  label:has(input[type="radio"]:not(:disabled))
+) {
+  cursor: pointer;
+}
+
+:where(button:disabled, select:disabled, input:disabled) {
+  cursor: not-allowed;
+}
+
 .app-shell {
   min-height: 100vh;
   background: var(--app-bg);
