@@ -13,6 +13,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Trash2,
   UserCog,
   UserPlus,
   Users,
@@ -20,9 +21,11 @@ import {
 } from 'lucide-react';
 import {
   createAdminCompany,
+  deleteAdminCompany,
   listAdminCompanies,
   listAdminUsers,
   manageUserAccess,
+  updateAdminCompany,
   type AdminCompany,
   type AdminListedUser,
   type AdminPremiumStatusFilter,
@@ -35,6 +38,7 @@ import { auth } from '../firebase';
 import { PLATFORM_TOOLS, buildDefaultToolFlags, normalizeToolFlags, type ToolFlags, type ToolId } from '../config/tools';
 import AppNavbar from '../components/common/AppNavbar';
 import type { AppTheme } from '../types/common';
+import { DEFAULT_COMPANY_COLORS } from '../types/company';
 
 type AdminUserAccessPageProps = {
   adminEmail: string;
@@ -59,11 +63,17 @@ type UserEditorForm = {
 
 type CompanyForm = {
   name: string;
+  noLogo: boolean;
   logoUrl: string;
   logoAlt: string;
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  useDefaultPrimaryColor: boolean;
+  useDefaultHeaderColor: boolean;
+  useDefaultLogoBackgroundColor: boolean;
+  emailDomain: string;
+  emailDomainEnabled: boolean;
 };
 
 const emptyUserForm = (): UserEditorForm => ({
@@ -78,11 +88,33 @@ const emptyUserForm = (): UserEditorForm => ({
 
 const emptyCompanyForm = (): CompanyForm => ({
   name: '',
+  noLogo: false,
   logoUrl: '',
   logoAlt: '',
-  primaryColor: '#2476ff',
-  headerColor: '#0e1628',
-  logoBackgroundColor: '#ffffff',
+  primaryColor: DEFAULT_COMPANY_COLORS.primaryColor,
+  headerColor: DEFAULT_COMPANY_COLORS.headerColor,
+  logoBackgroundColor: DEFAULT_COMPANY_COLORS.logoBackgroundColor,
+  useDefaultPrimaryColor: true,
+  useDefaultHeaderColor: true,
+  useDefaultLogoBackgroundColor: true,
+  emailDomain: '',
+  emailDomainEnabled: false,
+});
+
+const companyToForm = (company: AdminCompany): CompanyForm => ({
+  name: company.name,
+  noLogo: !company.logoUrl,
+  logoUrl: company.logoUrl || '',
+  logoAlt: company.logoAlt || '',
+  primaryColor: company.primaryColor || DEFAULT_COMPANY_COLORS.primaryColor,
+  headerColor: company.headerColor || DEFAULT_COMPANY_COLORS.headerColor,
+  logoBackgroundColor: company.logoBackgroundColor || DEFAULT_COMPANY_COLORS.logoBackgroundColor,
+  useDefaultPrimaryColor: company.primaryColor === DEFAULT_COMPANY_COLORS.primaryColor,
+  useDefaultHeaderColor: company.headerColor === DEFAULT_COMPANY_COLORS.headerColor,
+  useDefaultLogoBackgroundColor:
+    company.logoBackgroundColor === DEFAULT_COMPANY_COLORS.logoBackgroundColor,
+  emailDomain: company.emailDomain || '',
+  emailDomainEnabled: company.emailDomainEnabled === true && !!company.emailDomain,
 });
 
 const locale = 'es-MX';
@@ -105,6 +137,8 @@ export default function AdminUserAccessPage({
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
+  const [deletingCompanyId, setDeletingCompanyId] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState<CompanyForm>(() => emptyCompanyForm());
 
   const [users, setUsers] = useState<AdminListedUser[]>([]);
@@ -274,6 +308,19 @@ export default function AdminUserAccessPage({
     setCompanyForm((current) => ({ ...current, [key]: value }));
   };
 
+  const setCompanyColorDefault = (
+    colorKey: 'primaryColor' | 'headerColor' | 'logoBackgroundColor',
+    defaultKey: 'useDefaultPrimaryColor' | 'useDefaultHeaderColor' | 'useDefaultLogoBackgroundColor',
+    defaultColor: string,
+    enabled: boolean
+  ) => {
+    setCompanyForm((current) => ({
+      ...current,
+      [defaultKey]: enabled,
+      [colorKey]: enabled ? defaultColor : current[colorKey],
+    }));
+  };
+
   const normalizeMonthInput = (rawValue: string) => {
     const onlyDigits = rawValue.replace(/\D/g, '');
     if (!onlyDigits) return '';
@@ -422,6 +469,9 @@ export default function AdminUserAccessPage({
   const handleCreateUser = async () => {
     const payload = buildUserPayload(createForm, { createOnly: true });
     if (!payload) return;
+    if (!createForm.companyId) {
+      delete payload.companyId;
+    }
 
     setIsCreatingUser(true);
     setError(null);
@@ -447,15 +497,51 @@ export default function AdminUserAccessPage({
     }
   };
 
-  const handleCreateCompany = async () => {
+  const buildCompanyPayload = () => {
     const normalizedName = companyForm.name.trim();
-    const normalizedLogoUrl = companyForm.logoUrl.trim();
-    const normalizedLogoAlt = companyForm.logoAlt.trim();
+    const normalizedLogoUrl = companyForm.noLogo ? '' : companyForm.logoUrl.trim();
+    const normalizedLogoAlt = companyForm.noLogo ? '' : companyForm.logoAlt.trim();
+    const normalizedEmailDomain = companyForm.emailDomain.trim().toLowerCase().replace(/^@+/, '');
+    const primaryColor = companyForm.useDefaultPrimaryColor
+      ? DEFAULT_COMPANY_COLORS.primaryColor
+      : companyForm.primaryColor;
+    const headerColor = companyForm.useDefaultHeaderColor
+      ? DEFAULT_COMPANY_COLORS.headerColor
+      : companyForm.headerColor;
+    const logoBackgroundColor = companyForm.useDefaultLogoBackgroundColor
+      ? DEFAULT_COMPANY_COLORS.logoBackgroundColor
+      : companyForm.logoBackgroundColor;
 
     if (!normalizedName) {
       setError('Ingresa el nombre de la empresa.');
-      return;
+      return null;
     }
+
+    if (companyForm.emailDomainEnabled && !normalizedEmailDomain) {
+      setError('Ingresa un dominio de correo o desactiva la regla automatica.');
+      return null;
+    }
+
+    return {
+      name: normalizedName,
+      logoUrl: normalizedLogoUrl || null,
+      logoAlt: normalizedLogoAlt || null,
+      primaryColor,
+      headerColor,
+      logoBackgroundColor,
+      emailDomain: normalizedEmailDomain || null,
+      emailDomainEnabled: companyForm.emailDomainEnabled && !!normalizedEmailDomain,
+    };
+  };
+
+  const resetCompanyEditor = () => {
+    setEditingCompany(null);
+    setCompanyForm(emptyCompanyForm());
+  };
+
+  const handleSaveCompany = async () => {
+    const payload = buildCompanyPayload();
+    if (!payload) return;
 
     setIsCreatingCompany(true);
     setError(null);
@@ -463,24 +549,70 @@ export default function AdminUserAccessPage({
 
     try {
       const token = await getIdToken();
-      const result = await createAdminCompany(apiBaseUrl, token, {
-        name: normalizedName,
-        logoUrl: normalizedLogoUrl || null,
-        logoAlt: normalizedLogoAlt || null,
-        primaryColor: companyForm.primaryColor,
-        headerColor: companyForm.headerColor,
-        logoBackgroundColor: companyForm.logoBackgroundColor,
-      });
+      const result = editingCompany
+        ? await updateAdminCompany(apiBaseUrl, token, { id: editingCompany.id, ...payload })
+        : await createAdminCompany(apiBaseUrl, token, payload);
 
-      setCompanies((current) =>
-        [...current, result.company].sort((a, b) => a.name.localeCompare(b.name, locale))
+      setCompanies((current) => {
+        const next = editingCompany
+          ? current.map((company) => (company.id === result.company.id ? result.company : company))
+          : [...current, result.company];
+        return next.sort((a, b) => a.name.localeCompare(b.name, locale));
+      });
+      resetCompanyEditor();
+      setSuccess(
+        editingCompany
+          ? `Empresa actualizada: ${result.company.name}.`
+          : `Empresa creada: ${result.company.name}.`
       );
-      setCompanyForm(emptyCompanyForm());
-      setSuccess(`Empresa creada: ${result.company.name}.`);
     } catch (err: any) {
-      setError(err?.message || 'No se pudo crear la empresa.');
+      const message = err?.message || '';
+      setError(
+        message.includes('Domain already assigned')
+          ? 'Ese dominio ya esta activo en otra empresa.'
+          : message || 'No se pudo guardar la empresa.'
+      );
     } finally {
       setIsCreatingCompany(false);
+    }
+  };
+
+  const handleEditCompany = (company: AdminCompany) => {
+    setEditingCompany(company);
+    setCompanyForm(companyToForm(company));
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleDeleteCompany = async (company: AdminCompany) => {
+    const confirmed = window.confirm(
+      `¿Borrar la empresa "${company.name}"? Los usuarios asignados volveran al diseño default.`
+    );
+    if (!confirmed) return;
+
+    setDeletingCompanyId(company.id);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const token = await getIdToken();
+      const result = await deleteAdminCompany(apiBaseUrl, token, company.id);
+
+      setCompanies((current) => current.filter((item) => item.id !== company.id));
+      setUsers((current) =>
+        current.map((user) =>
+          user.companyId === company.id ? { ...user, companyId: null } : user
+        )
+      );
+      if (editingCompany?.id === company.id) resetCompanyEditor();
+
+      setSuccess(
+        `Empresa borrada: ${company.name}. Usuarios actualizados: ${result.affectedUsers}.`
+      );
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo borrar la empresa.');
+    } finally {
+      setDeletingCompanyId(null);
     }
   };
 
@@ -1060,6 +1192,36 @@ export default function AdminUserAccessPage({
                         />
                         Header
                       </span>
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs border rounded-lg px-2 py-1 bg-white ${
+                          company.emailDomainEnabled && company.emailDomain
+                            ? 'text-emerald-700 border-emerald-200'
+                            : 'text-slate-500 border-slate-200'
+                        }`}
+                      >
+                        {company.emailDomainEnabled && company.emailDomain
+                          ? `@${company.emailDomain}`
+                          : 'Dominio inactivo'}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditCompany(company)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCompany(company)}
+                        disabled={deletingCompanyId === company.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingCompanyId === company.id ? 'Borrando...' : 'Borrar'}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1073,9 +1235,13 @@ export default function AdminUserAccessPage({
         <div className="flex items-start gap-2">
           <Palette className="w-4 h-4 text-indigo-600 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-slate-800">Crear empresa</p>
+            <p className="text-sm font-semibold text-slate-800">
+              {editingCompany ? 'Editar empresa' : 'Crear empresa'}
+            </p>
             <p className="text-xs text-slate-500 mt-1">
-              El logo se guarda como URL publica; los colores se aplican al usuario asignado.
+              {editingCompany
+                ? `Editando: ${editingCompany.name}`
+                : 'El logo se guarda como URL publica; los colores se aplican al usuario asignado.'}
             </p>
           </div>
         </div>
@@ -1092,74 +1258,216 @@ export default function AdminUserAccessPage({
             />
           </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-slate-600">URL del logo</span>
-            <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
-              <Image className="w-4 h-4 text-slate-400" />
-              <input
-                type="url"
-                value={companyForm.logoUrl}
-                onChange={(event) => updateCompanyForm('logoUrl', event.target.value)}
-                placeholder="https://..."
-                className="w-full bg-transparent outline-none text-sm"
-              />
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Logo</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Puedes crear la empresa sin logo y conservar solo el fondo.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={companyForm.noLogo}
+                  onChange={(event) =>
+                    setCompanyForm((current) => ({
+                      ...current,
+                      noLogo: event.target.checked,
+                      logoUrl: event.target.checked ? '' : current.logoUrl,
+                      logoAlt: event.target.checked ? '' : current.logoAlt,
+                    }))
+                  }
+                  className="accent-indigo-600"
+                />
+                Sin logo
+              </label>
             </div>
-          </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-slate-600">Texto alternativo del logo</span>
-            <input
-              type="text"
-              value={companyForm.logoAlt}
-              onChange={(event) => updateCompanyForm('logoAlt', event.target.value)}
-              placeholder="Opcional"
-              className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            />
-          </label>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-16 h-16 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden shrink-0"
+                style={{
+                  backgroundColor: companyForm.useDefaultLogoBackgroundColor
+                    ? DEFAULT_COMPANY_COLORS.logoBackgroundColor
+                    : companyForm.logoBackgroundColor,
+                }}
+              >
+                {!companyForm.noLogo && companyForm.logoUrl ? (
+                  <img
+                    src={companyForm.logoUrl}
+                    alt={companyForm.logoAlt || companyForm.name || 'Logo de empresa'}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <Building2 className="w-7 h-7 text-slate-400" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-slate-600">URL del logo</span>
+                  <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
+                    <Image className="w-4 h-4 text-slate-400" />
+                    <input
+                      type="url"
+                      value={companyForm.logoUrl}
+                      disabled={companyForm.noLogo}
+                      onChange={(event) => updateCompanyForm('logoUrl', event.target.value)}
+                      placeholder={companyForm.noLogo ? 'Sin logo' : 'https://...'}
+                      className="w-full bg-transparent outline-none text-sm disabled:opacity-60"
+                    />
+                  </div>
+                </label>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-600">Primario</span>
+              <span className="text-sm font-medium text-slate-600">Texto alternativo del logo</span>
               <input
-                type="color"
-                value={companyForm.primaryColor}
-                onChange={(event) => updateCompanyForm('primaryColor', event.target.value)}
-                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-600">Header</span>
-              <input
-                type="color"
-                value={companyForm.headerColor}
-                onChange={(event) => updateCompanyForm('headerColor', event.target.value)}
-                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-600">Fondo logo</span>
-              <input
-                type="color"
-                value={companyForm.logoBackgroundColor}
-                onChange={(event) => updateCompanyForm('logoBackgroundColor', event.target.value)}
-                className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1"
+                type="text"
+                value={companyForm.logoAlt}
+                disabled={companyForm.noLogo}
+                onChange={(event) => updateCompanyForm('logoAlt', event.target.value)}
+                placeholder={companyForm.noLogo ? 'Sin logo' : 'Opcional'}
+                className="border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
               />
             </label>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCreateCompany}
-            disabled={isCreatingCompany}
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Save className="w-4 h-4" />
-            {isCreatingCompany ? 'Creando empresa...' : 'Crear empresa'}
-          </button>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Dominio de correo</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Asigna esta empresa automaticamente a usuarios sin empresa cuyo correo coincida.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={companyForm.emailDomainEnabled}
+                  onChange={(event) => updateCompanyForm('emailDomainEnabled', event.target.checked)}
+                  className="accent-indigo-600"
+                />
+                Activo
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-slate-600">Dominio</span>
+              <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
+                <span className="text-sm font-semibold text-slate-400">@</span>
+                <input
+                  type="text"
+                  value={companyForm.emailDomain}
+                  onChange={(event) =>
+                    updateCompanyForm(
+                      'emailDomain',
+                      event.target.value.trim().toLowerCase().replace(/^@+/, '')
+                    )
+                  }
+                  placeholder="bimbo.mx"
+                  className="w-full bg-transparent outline-none text-sm"
+                />
+              </div>
+            </label>
+
+            <p className="text-xs text-slate-500">
+              Si esta inactivo o vacio, no se aplica ninguna asignacion automatica por dominio.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            {renderColorControl(
+              'Primario',
+              'primaryColor',
+              'useDefaultPrimaryColor',
+              DEFAULT_COMPANY_COLORS.primaryColor
+            )}
+            {renderColorControl(
+              'Header',
+              'headerColor',
+              'useDefaultHeaderColor',
+              DEFAULT_COMPANY_COLORS.headerColor
+            )}
+            {renderColorControl(
+              'Fondo logo',
+              'logoBackgroundColor',
+              'useDefaultLogoBackgroundColor',
+              DEFAULT_COMPANY_COLORS.logoBackgroundColor
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            {editingCompany && (
+              <button
+                type="button"
+                onClick={resetCompanyEditor}
+                disabled={isCreatingCompany}
+                className="inline-flex flex-1 items-center justify-center gap-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSaveCompany}
+              disabled={isCreatingCompany}
+              className="inline-flex flex-1 items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 border border-indigo-600 hover:bg-indigo-700 rounded-xl px-5 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4" />
+              {isCreatingCompany
+                ? 'Guardando...'
+                : editingCompany
+                  ? 'Guardar cambios'
+                  : 'Crear empresa'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
+
+  const renderColorControl = (
+    label: string,
+    colorKey: 'primaryColor' | 'headerColor' | 'logoBackgroundColor',
+    defaultKey: 'useDefaultPrimaryColor' | 'useDefaultHeaderColor' | 'useDefaultLogoBackgroundColor',
+    defaultColor: string
+  ) => {
+    const usesDefault = companyForm[defaultKey];
+    const colorValue = usesDefault ? defaultColor : companyForm[colorKey];
+
+    return (
+      <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-slate-600">{label}</span>
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+            <input
+              type="checkbox"
+              checked={usesDefault}
+              onChange={(event) =>
+                setCompanyColorDefault(colorKey, defaultKey, defaultColor, event.target.checked)
+              }
+              className="accent-indigo-600"
+            />
+            Predeterminado
+          </label>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2 items-center">
+          <input
+            type="color"
+            value={colorValue}
+            disabled={usesDefault}
+            onChange={(event) => updateCompanyForm(colorKey, event.target.value)}
+            className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1 disabled:opacity-60"
+          />
+          <span className="text-xs font-semibold text-slate-500 text-right tabular-nums">
+            {colorValue.toUpperCase()}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen app-shell font-sans">

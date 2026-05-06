@@ -4,7 +4,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldPath, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
 const { normalizeToolFlags } = require('../_tools.js');
-const { COMPANIES_COLLECTION, normalizeCompanyIdInput } = require('../_companies.js');
+const { COMPANIES_COLLECTION, normalizeCompanyIdInput, normalizeEmailDomain } = require('../_companies.js');
 
 const parseAllowedAdminEmails = (rawValue) =>
   (rawValue || '')
@@ -32,6 +32,30 @@ const toDateOrNull = (value) => {
 };
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const getEmailDomain = (email) => {
+  const atIndex = typeof email === 'string' ? email.lastIndexOf('@') : -1;
+  if (atIndex < 0) return null;
+  return normalizeEmailDomain(email.slice(atIndex + 1));
+};
+
+const findCompanyIdByEmailDomain = async (db, email) => {
+  const emailDomain = getEmailDomain(email);
+  if (!emailDomain) return null;
+
+  const snap = await db
+    .collection(COMPANIES_COLLECTION)
+    .where('emailDomainLower', '==', emailDomain)
+    .limit(5)
+    .get();
+
+  const match = snap.docs.find((docSnap) => {
+    const data = docSnap.data() || {};
+    return data.emailDomainEnabled === true && data.isActive !== false;
+  });
+
+  return match ? match.id : null;
+};
 
 const ensureAuthorizedAdmin = async (req, res) => {
   const decodedToken = await verifyFirebaseToken(req, res);
@@ -341,7 +365,11 @@ module.exports = async function handler(req, res) {
       ? premiumToolsInput
       : normalizeToolFlags(existingData.premiumTools, true);
     const existingCompanyId = normalizeCompanyIdInput(existingData.companyId);
-    const nextCompanyId = hasCompanyInput ? companyIdInput : existingCompanyId;
+    const domainCompanyId =
+      !hasCompanyInput && !existingCompanyId
+        ? await findCompanyIdByEmailDomain(db, userRecord.email || email)
+        : null;
+    const nextCompanyId = hasCompanyInput ? companyIdInput : existingCompanyId || domainCompanyId;
 
     let premiumExpiresAt = null;
     let premiumExpiresAtTimestamp = null;
@@ -400,6 +428,7 @@ module.exports = async function handler(req, res) {
         premiumGrantedAt: nextPremium ? serverNow : null,
         premiumSource: nextPremium ? 'manual' : null,
         companyId: nextCompanyId,
+        companyAssignedByDomain: !hasCompanyInput && !!domainCompanyId,
         toolAccess: nextToolAccess,
         premiumTools: nextPremiumTools,
         lastStripeSessionId: null,
@@ -413,6 +442,11 @@ module.exports = async function handler(req, res) {
         premiumExpiresAt: premiumExpiresAtTimestamp,
         premiumSource: nextPremium ? (existingData.premiumSource || 'manual') : null,
         companyId: nextCompanyId,
+        companyAssignedByDomain: hasCompanyInput
+          ? false
+          : !hasCompanyInput && !!domainCompanyId
+            ? true
+            : existingData.companyAssignedByDomain === true,
         toolAccess: nextToolAccess,
         premiumTools: nextPremiumTools,
         updatedAt: serverNow,

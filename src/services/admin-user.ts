@@ -24,6 +24,8 @@ type AdminCompany = {
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  emailDomain: string | null;
+  emailDomainEnabled: boolean;
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -36,6 +38,12 @@ type CreateAdminCompanyPayload = {
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  emailDomain?: string | null;
+  emailDomainEnabled?: boolean;
+};
+
+type UpdateAdminCompanyPayload = CreateAdminCompanyPayload & {
+  id: string;
 };
 
 type AdminSearchField = 'all' | 'email' | 'displayName';
@@ -66,6 +74,12 @@ type ListAdminCompaniesResult = {
 type CreateAdminCompanyResult = {
   ok: boolean;
   company: AdminCompany;
+};
+
+type DeleteAdminCompanyResult = {
+  ok: boolean;
+  id: string;
+  affectedUsers: number;
 };
 
 type ListAdminUsersResult = {
@@ -197,12 +211,57 @@ export const createAdminCompany = async (
   return data as CreateAdminCompanyResult;
 };
 
+export const updateAdminCompany = async (
+  apiBaseUrl: string,
+  token: string,
+  payload: UpdateAdminCompanyPayload
+): Promise<CreateAdminCompanyResult> => {
+  const response = await fetch(`${apiBaseUrl}/api/admin/companies`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Could not update company.');
+  }
+
+  return data as CreateAdminCompanyResult;
+};
+
+export const deleteAdminCompany = async (
+  apiBaseUrl: string,
+  token: string,
+  id: string
+): Promise<DeleteAdminCompanyResult> => {
+  const response = await fetch(`${apiBaseUrl}/api/admin/companies`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ id }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'Could not delete company.');
+  }
+
+  return data as DeleteAdminCompanyResult;
+};
+
 export type {
   ManageUserAccessPayload,
   ManageUserAccessResult,
   AdminListedUser,
   AdminCompany,
   CreateAdminCompanyPayload,
+  UpdateAdminCompanyPayload,
   ListAdminUsersResult,
   ListAdminCompaniesResult,
   ListAdminUsersParams,

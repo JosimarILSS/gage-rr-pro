@@ -34,8 +34,24 @@ const ensureAuthorizedAdmin = async (req, res) => {
   return decodedToken;
 };
 
+const ensureUniqueActiveDomain = async (db, emailDomain, currentCompanyId = null) => {
+  if (!emailDomain) return null;
+
+  const snap = await db
+    .collection(COMPANIES_COLLECTION)
+    .where('emailDomainLower', '==', emailDomain)
+    .limit(5)
+    .get();
+
+  const conflictingDoc = snap.docs.find((docSnap) => {
+    const data = docSnap.data() || {};
+    return docSnap.id !== currentCompanyId && data.emailDomainEnabled === true;
+  });
+  return conflictingDoc ? mapCompanyDoc(conflictingDoc) : null;
+};
+
 module.exports = async function handler(req, res) {
-  if (req.method !== 'GET' && req.method !== 'POST') {
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method)) {
     res.status(405).json({ error: 'Method not allowed.' });
     return;
   }
@@ -65,6 +81,61 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  if (req.method === 'DELETE') {
+    const companyId = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+    if (!companyId) {
+      res.status(400).json({ error: 'Company id is required.' });
+      return;
+    }
+
+    try {
+      const companyRef = db.collection(COMPANIES_COLLECTION).doc(companyId);
+      const companySnap = await companyRef.get();
+      if (!companySnap.exists) {
+        res.status(404).json({ error: 'Company not found.' });
+        return;
+      }
+
+      const assignedUsersSnap = await db
+        .collection('usuarios')
+        .where('companyId', '==', companyId)
+        .get();
+
+      const serverNow = FieldValue.serverTimestamp();
+      let batch = db.batch();
+      let operations = 0;
+      let affectedUsers = 0;
+
+      for (const userDoc of assignedUsersSnap.docs) {
+        batch.update(userDoc.ref, {
+          companyId: null,
+          updatedAt: serverNow,
+        });
+        operations += 1;
+        affectedUsers += 1;
+
+        if (operations >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          operations = 0;
+        }
+      }
+
+      batch.delete(companyRef);
+      await batch.commit();
+
+      res.status(200).json({
+        ok: true,
+        id: companyId,
+        affectedUsers,
+      });
+    } catch (error) {
+      console.error('[admin-companies:delete] Failed:', error.message);
+      res.status(500).json({ error: 'Could not delete company.' });
+    }
+    return;
+  }
+
   const { payload, error } = buildCompanyPayload(req.body);
   if (error) {
     res.status(400).json({ error });
@@ -73,6 +144,55 @@ module.exports = async function handler(req, res) {
 
   try {
     const now = FieldValue.serverTimestamp();
+
+    if (req.method === 'PATCH') {
+      const companyId = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+      if (!companyId) {
+        res.status(400).json({ error: 'Company id is required.' });
+        return;
+      }
+
+      const companyRef = db.collection(COMPANIES_COLLECTION).doc(companyId);
+      const companySnap = await companyRef.get();
+      if (!companySnap.exists) {
+        res.status(404).json({ error: 'Company not found.' });
+        return;
+      }
+
+      if (payload.emailDomainEnabled) {
+        const conflict = await ensureUniqueActiveDomain(db, payload.emailDomain, companyId);
+        if (conflict) {
+          res.status(409).json({
+            error: `Domain already assigned to ${conflict.name}.`,
+          });
+          return;
+        }
+      }
+
+      await companyRef.update({
+        ...payload,
+        updatedBy: decodedToken.uid,
+        updatedAt: now,
+      });
+
+      const updatedSnap = await companyRef.get();
+      res.status(200).json({
+        ok: true,
+        company: mapCompanyDoc(updatedSnap),
+      });
+      return;
+    }
+
+    if (payload.emailDomainEnabled) {
+      const conflict = await ensureUniqueActiveDomain(db, payload.emailDomain);
+      if (conflict) {
+        res.status(409).json({
+          error: `Domain already assigned to ${conflict.name}.`,
+        });
+        return;
+      }
+    }
+
     const docRef = await db.collection(COMPANIES_COLLECTION).add({
       ...payload,
       createdBy: decodedToken.uid,

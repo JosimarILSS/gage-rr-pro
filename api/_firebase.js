@@ -4,6 +4,7 @@ const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { buildDefaultToolFlags, normalizeToolFlags } = require('./_tools.js');
+const { COMPANIES_COLLECTION, normalizeEmailDomain } = require('./_companies.js');
 
 const getFirebaseApp = () => {
   if (getApps().length > 0) return getApps()[0];
@@ -52,6 +53,31 @@ const verifyFirebaseToken = async (req, res) => {
   }
 };
 
+const getEmailDomain = (email) => {
+  if (typeof email !== 'string') return null;
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex < 0) return null;
+  return normalizeEmailDomain(email.slice(atIndex + 1));
+};
+
+const findCompanyIdByEmailDomain = async (db, email) => {
+  const emailDomain = getEmailDomain(email);
+  if (!emailDomain) return null;
+
+  const snap = await db
+    .collection(COMPANIES_COLLECTION)
+    .where('emailDomainLower', '==', emailDomain)
+    .limit(5)
+    .get();
+
+  const match = snap.docs.find((docSnap) => {
+    const data = docSnap.data() || {};
+    return data.emailDomainEnabled === true && data.isActive !== false;
+  });
+
+  return match ? match.id : null;
+};
+
 /**
  * Crea el documento del usuario en Firestore si no existe todavía.
  * Se llama al hacer login por primera vez.
@@ -65,6 +91,7 @@ const registerUserIfNew = async (uid) => {
   const doc = await userRef.get();
   const userRecord = await auth.getUser(uid);
   const now = FieldValue.serverTimestamp();
+  const matchedCompanyId = await findCompanyIdByEmailDomain(db, userRecord.email);
 
   if (!doc.exists) {
     // Primera vez — crear documento completo
@@ -77,7 +104,8 @@ const registerUserIfNew = async (uid) => {
       premiumExpiresAt: null,
       premiumGrantedAt: null,
       premiumSource: null,
-      companyId: null,
+      companyId: matchedCompanyId,
+      companyAssignedByDomain: !!matchedCompanyId,
       toolAccess: buildDefaultToolFlags(true),
       premiumTools: buildDefaultToolFlags(true),
       lastStripeSessionId: null,
@@ -96,6 +124,10 @@ const registerUserIfNew = async (uid) => {
   if (!data.email && userRecord.email) profileUpdate.email = userRecord.email;
   if (!data.displayName && userRecord.displayName) profileUpdate.displayName = userRecord.displayName;
   if (!data.photoURL && userRecord.photoURL) profileUpdate.photoURL = userRecord.photoURL;
+  if (!data.companyId && matchedCompanyId) {
+    profileUpdate.companyId = matchedCompanyId;
+    profileUpdate.companyAssignedByDomain = true;
+  }
 
   if (Object.keys(profileUpdate).length > 0) {
     profileUpdate.updatedAt = now;
