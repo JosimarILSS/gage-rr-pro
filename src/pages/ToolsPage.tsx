@@ -17,11 +17,14 @@ import {
 } from 'lucide-react';
 import type { UserAccountProfile } from '../services/auth';
 import { isToolEnabled, type ToolFlags, type ToolId } from '../config/tools';
-import type { Lang } from '../types/common';
+import AppNavbar from '../components/common/AppNavbar';
+import type { AppTheme, Lang } from '../types/common';
 
 type ToolsPageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   onToggleLang: () => void;
+  onToggleTheme: () => void;
   accountProfile: UserAccountProfile | null;
   userEmail: string | null | undefined;
   userDisplayName: string | null | undefined;
@@ -66,7 +69,9 @@ const getInitials = (value: string) =>
 
 export default function ToolsPage({
   lang,
+  appTheme,
   onToggleLang,
+  onToggleTheme,
   accountProfile,
   userEmail,
   userDisplayName,
@@ -217,8 +222,11 @@ export default function ToolsPage({
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <AppNavbar
+        lang={lang}
+        appTheme={appTheme}
+        onToggleTheme={onToggleTheme}
+        left={
           <div className="flex items-center gap-3 min-w-0">
             <div className="app-icon-tile shrink-0">
               <Wrench className="w-5 h-5" />
@@ -228,7 +236,8 @@ export default function ToolsPage({
               <h1 className="text-2xl app-title">{copy.toolsTitle}</h1>
             </div>
           </div>
-
+        }
+        right={
           <div className="flex flex-wrap items-center gap-2">
             {showAdminAccessButton && onGoToAdminAccess && (
               <button
@@ -249,8 +258,8 @@ export default function ToolsPage({
               {copy.language}
             </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-6 lg:py-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-8">
         <section className="space-y-5">

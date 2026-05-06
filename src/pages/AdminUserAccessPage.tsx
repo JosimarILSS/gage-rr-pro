@@ -13,14 +13,24 @@ import {
 } from '../services/admin-user';
 import { auth } from '../firebase';
 import { PLATFORM_TOOLS, buildDefaultToolFlags, normalizeToolFlags, type ToolFlags, type ToolId } from '../config/tools';
+import AppNavbar from '../components/common/AppNavbar';
+import type { AppTheme } from '../types/common';
 
 type AdminUserAccessPageProps = {
   adminEmail: string;
+  appTheme: AppTheme;
   onLogout: () => Promise<void>;
   onBackHome: () => void;
+  onToggleTheme: () => void;
 };
 
-export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }: AdminUserAccessPageProps) {
+export default function AdminUserAccessPage({
+  adminEmail,
+  appTheme,
+  onLogout,
+  onBackHome,
+  onToggleTheme,
+}: AdminUserAccessPageProps) {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserDisplayName, setNewUserDisplayName] = useState('');
   const [newUserAccessMode, setNewUserAccessMode] = useState<'months' | 'vip' | 'none'>('months');
@@ -394,10 +404,13 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-5">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex items-start justify-between gap-3">
-          <div>
+    <div className="min-h-screen app-shell font-sans">
+      <AppNavbar
+        lang="es"
+        appTheme={appTheme}
+        onToggleTheme={onToggleTheme}
+        left={
+          <div className="min-w-0">
             <div className="inline-flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1">
               <ShieldCheck className="w-4 h-4" />
               Acceso administrativo restringido
@@ -405,6 +418,8 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
             <h1 className="text-2xl font-bold text-slate-800 mt-3">Administración de usuarios</h1>
             <p className="text-sm text-slate-600 mt-1">Sesión autorizada: {adminEmail}</p>
           </div>
+        }
+        right={
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -431,8 +446,10 @@ export default function AdminUserAccessPage({ adminEmail, onLogout, onBackHome }
               Cerrar sesión
             </button>
           </div>
-        </div>
+        }
+      />
 
+      <div className="max-w-7xl mx-auto space-y-5 p-4 md:p-8">
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
           <div className="border border-slate-200 rounded-2xl bg-slate-50">
             <div className="p-5 border-b border-slate-200 flex flex-col gap-1">

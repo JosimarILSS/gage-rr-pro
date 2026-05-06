@@ -44,6 +44,7 @@
   }
 
   /* Ocultar controles interactivos del sidebar */
+  body.printing-pdf .app-navbar,
   body.printing-pdf #print-sidebar-hide,
   body.printing-pdf #print-logout-hide,
   body.printing-pdf #print-sidebar-open-mobile,

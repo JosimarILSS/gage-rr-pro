@@ -1,23 +1,30 @@
 import { Shield, LogIn, Home } from 'lucide-react';
-import type { Lang } from '../types/common';
+import AppNavbar from '../components/common/AppNavbar';
+import type { AppTheme, Lang } from '../types/common';
 
 type AdminAccessGatePageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   isAuthLoading: boolean;
   authError: string | null;
   onGoogleLogin: () => Promise<void>;
   onBackHome: () => void;
+  onToggleTheme: () => void;
 };
 
 export default function AdminAccessGatePage({
   lang,
+  appTheme,
   isAuthLoading,
   authError,
   onGoogleLogin,
   onBackHome,
+  onToggleTheme,
 }: AdminAccessGatePageProps) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen app-shell flex flex-col font-sans">
+      <AppNavbar lang={lang} appTheme={appTheme} onToggleTheme={onToggleTheme} />
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-lg p-8 space-y-5">
         <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center">
           <Shield className="w-7 h-7 text-indigo-600" />
@@ -51,6 +58,7 @@ export default function AdminAccessGatePage({
             {authError}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

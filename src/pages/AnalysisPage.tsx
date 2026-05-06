@@ -18,9 +18,10 @@ import {
 } from 'recharts';
 import SidebarLayout from '../layouts/SidebarLayout';
 import PremiumUnlockCard from '../components/premium/PremiumUnlockCard';
+import AppNavbar from '../components/common/AppNavbar';
 import { t } from '../translations';
 import type { UseGageRRWorkspaceResult } from '../hooks/useGageRRWorkspace';
-import type { Lang } from '../types/common';
+import type { AppTheme, Lang } from '../types/common';
 
 const PartTooltip = ({ active, payload, label, measLabel }: any) => {
   if (!active || !payload?.length) return null;
@@ -62,7 +63,9 @@ const CrossedCircle = (props: any) => {
 
 type AnalysisPageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   onToggleLang: () => void;
+  onToggleTheme: () => void;
   userEmail: string | null | undefined;
   onLogout: () => Promise<void>;
   esPremium: boolean;
@@ -77,7 +80,9 @@ type AnalysisPageProps = {
 
 export default function AnalysisPage({
   lang,
+  appTheme,
   onToggleLang,
+  onToggleTheme,
   userEmail,
   onLogout,
   esPremium,
@@ -176,31 +181,42 @@ export default function AnalysisPage({
     <SidebarLayout
       mainRef={mainPanelRef}
       mobileSidebarCollapsed={data.length > 0}
+      navbar={
+        <AppNavbar
+          lang={lang}
+          appTheme={appTheme}
+          onToggleTheme={onToggleTheme}
+          left={
+            onBackToTools ? (
+              <button
+                type="button"
+                onClick={onBackToTools}
+                className="app-button app-button-secondary px-3 py-2 text-sm"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {lang === 'es' ? 'Volver a herramientas' : 'Back to tools'}
+              </button>
+            ) : null
+          }
+          right={
+            <button
+              onClick={onToggleLang}
+              className="app-button app-button-secondary px-3 py-2 text-sm"
+            >
+              <Globe className="w-4 h-4" />
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          }
+        />
+      }
       sidebar={
         <>
         <div>
-          {onBackToTools && (
-            <button
-              type="button"
-              onClick={onBackToTools}
-              className="app-button app-button-secondary mb-4 px-3 py-2 text-sm"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {lang === 'es' ? 'Volver a herramientas' : 'Back to tools'}
-            </button>
-          )}
           <div className="flex justify-between items-start mb-4 pr-12 md:pr-0">
             <h1 className="text-xl app-title flex items-center gap-2">
               <BarChart3 style={{ color: 'var(--app-primary)' }} />
               {t[lang].title}
             </h1>
-            <button
-              onClick={onToggleLang}
-              className="app-button app-button-secondary px-3 py-2 md:px-2 md:py-1 text-sm md:text-xs"
-            >
-              <Globe className="w-4 h-4 md:w-3 md:h-3" />
-              {lang === 'es' ? 'EN' : 'ES'}
-            </button>
           </div>
           <p className="text-sm app-muted mt-1">{t[lang].subtitle}</p>
         </div>
@@ -255,7 +271,7 @@ export default function AnalysisPage({
         </div>
 
         <div id="print-logout-hide" className="mt-auto pt-6 border-t app-divider space-y-3">
-          {showAdminAccessButton && onGoToAdminAccess && (
+          {/* {showAdminAccessButton && onGoToAdminAccess && (
             <button
               type="button"
               onClick={onGoToAdminAccess}
@@ -264,7 +280,7 @@ export default function AnalysisPage({
               <ShieldCheck className="w-4 h-4" />
               {lang === 'es' ? 'Acceso a administración de usuarios' : 'User Admin Access'}
             </button>
-          )}
+          )} */}
           <div className="flex items-center justify-between">
             <div className="text-sm app-muted truncate pr-2" title={userEmail || ''}>
               {userEmail}

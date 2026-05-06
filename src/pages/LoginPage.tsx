@@ -1,26 +1,31 @@
 import { useState, type FormEvent } from 'react';
 import { BarChart3, Globe, Mail, Lock } from 'lucide-react';
+import AppNavbar from '../components/common/AppNavbar';
 import { t } from '../translations';
-import type { Lang } from '../types/common';
+import type { AppTheme, Lang } from '../types/common';
 
 type LoginPageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   authError: string | null;
   isAuthLoading: boolean;
   onGoogleLogin: () => Promise<void>;
   onEmailLogin: (email: string, password: string) => Promise<void>;
   onEmailRegister: (email: string, password: string, confirmPassword: string) => Promise<void>;
   onToggleLang: () => void;
+  onToggleTheme: () => void;
 };
 
 export default function LoginPage({
   lang,
+  appTheme,
   authError,
   isAuthLoading,
   onGoogleLogin,
   onEmailLogin,
   onEmailRegister,
   onToggleLang,
+  onToggleTheme,
 }: LoginPageProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -39,7 +44,22 @@ export default function LoginPage({
   };
 
   return (
-    <div className="app-shell flex flex-col items-center justify-center p-4">
+    <div className="app-shell flex flex-col">
+      <AppNavbar
+        lang={lang}
+        appTheme={appTheme}
+        onToggleTheme={onToggleTheme}
+        right={
+          <button
+            onClick={onToggleLang}
+            className="app-button app-button-secondary text-sm px-3 py-2"
+          >
+            <Globe className="w-4 h-4" /> {lang === 'es' ? 'EN' : 'ES'}
+          </button>
+        }
+      />
+
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="max-w-md w-full app-panel p-8 text-center space-y-5">
         <div className="app-icon-tile mx-auto mb-4" style={{ width: '4rem', height: '4rem' }}>
           <BarChart3 className="w-8 h-8" />
@@ -177,14 +197,7 @@ export default function LoginPage({
             {authError}
           </div>
         )}
-        <div className="pt-4">
-          <button
-            onClick={onToggleLang}
-            className="app-button app-button-secondary text-sm px-3 py-2 mx-auto"
-          >
-            <Globe className="w-4 h-4" /> {lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
-          </button>
-        </div>
+      </div>
       </div>
     </div>
   );

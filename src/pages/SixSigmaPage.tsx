@@ -30,6 +30,7 @@ import {
   YAxis,
 } from 'recharts';
 import SidebarLayout from '../layouts/SidebarLayout';
+import AppNavbar from '../components/common/AppNavbar';
 import {
   calculateAndersonDarling,
   calculateCapability,
@@ -39,11 +40,13 @@ import {
   getProbabilityPlotPoints,
   type SubgroupData,
 } from '../utils/six-sigma-stats';
-import type { Lang } from '../types/common';
+import type { AppTheme, Lang } from '../types/common';
 
 type SixSigmaPageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   onToggleLang: () => void;
+  onToggleTheme: () => void;
   onBackToTools: () => void;
 };
 
@@ -263,7 +266,13 @@ const getDistributionReason = (dist: string | undefined, t: (typeof translations
   return '';
 };
 
-export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixSigmaPageProps) {
+export default function SixSigmaPage({
+  lang,
+  appTheme,
+  onToggleLang,
+  onToggleTheme,
+  onBackToTools,
+}: SixSigmaPageProps) {
   const t = translations[lang];
   const [lsl, setLsl] = useState<number>(9);
   const [usl, setUsl] = useState<number>(11);
@@ -413,21 +422,39 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
 
   return (
     <SidebarLayout
+      navbar={
+        <AppNavbar
+          lang={lang}
+          appTheme={appTheme}
+          onToggleTheme={onToggleTheme}
+          left={
+            <button
+              type="button"
+              onClick={onBackToTools}
+              className="app-button app-button-secondary px-3 py-2 text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t.back}
+            </button>
+          }
+          right={
+            <button
+              type="button"
+              onClick={onToggleLang}
+              className="app-button app-button-secondary px-3 py-2 text-sm"
+            >
+              <Globe className="w-4 h-4" />
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          }
+        />
+      }
       mobileSidebarCollapsed={subgroups.length > 0}
       sidebarClassName="md:!w-[340px] md:!max-w-[340px] lg:!w-[360px] lg:!max-w-[360px] xl:!w-[380px] xl:!max-w-[380px]"
       mainClassName="pb-32 md:p-6 md:pb-6 xl:p-8 xl:pb-8"
       sidebar={
         <>
           <div>
-            <button
-              type="button"
-              onClick={onBackToTools}
-              className="app-button app-button-secondary mb-5 px-3 py-2 text-sm"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {t.back}
-            </button>
-
             <div className="flex items-start justify-between gap-3 pr-12 md:pr-0">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="app-icon-tile shrink-0">
@@ -438,15 +465,6 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                   <p className="text-xs font-medium app-muted uppercase">{t.subtitle}</p>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onToggleLang}
-                className="app-button app-button-secondary shrink-0 px-3 py-2 text-xs"
-              >
-                <Globe className="w-4 h-4" />
-                {lang === 'es' ? 'EN' : 'ES'}
-              </button>
             </div>
           </div>
 
@@ -787,12 +805,12 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--app-chart-grid)" />
                       <XAxis
                         type="number"
                         dataKey="val"
                         name={t.observedValue}
-                        stroke="#94A3B8"
+                        stroke="var(--app-chart-axis)"
                         fontSize={12}
                         domain={['auto', 'auto']}
                         label={{ value: chartLabelX, position: 'bottom', offset: 0, fontSize: 10, fontWeight: 'bold' }}
@@ -801,12 +819,12 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                         type="number"
                         dataKey="z"
                         name={t.probability}
-                        stroke="#94A3B8"
+                        stroke="var(--app-chart-axis)"
                         fontSize={12}
                         label={{ value: chartLabelY, angle: -90, position: 'left', fontSize: 10, fontWeight: 'bold' }}
                       />
                       <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                      <Scatter name={t.data} data={probPlotData} fill="#3B82F6" />
+                      <Scatter name={t.data} data={probPlotData} fill="var(--app-chart-tertiary)" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>
@@ -827,9 +845,9 @@ export default function SixSigmaPage({ lang, onToggleLang, onBackToTools }: SixS
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
                     <ComposedChart data={histogramData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="mid" stroke="#94A3B8" fontSize={10} tickFormatter={(value) => Number(value).toFixed(2)} />
-                      <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--app-chart-grid)" />
+                      <XAxis dataKey="mid" stroke="var(--app-chart-axis)" fontSize={10} tickFormatter={(value) => Number(value).toFixed(2)} />
+                      <YAxis stroke="var(--app-chart-axis)" fontSize={12} tickLine={false} axisLine={false} />
                       <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                       {!Number.isNaN(lsl) && (
                         <ReferenceLine x={lsl} stroke="#F43F5E" strokeWidth={2} label={{ position: 'top', value: 'LSL', fill: '#F43F5E', fontSize: 10, fontWeight: 'bold' }} />
@@ -921,9 +939,9 @@ function ControlChartCard({
       <div className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-            <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--app-chart-grid)" />
+            <XAxis dataKey="x" stroke="var(--app-chart-axis)" fontSize={12} tickLine={false} axisLine={false} />
+            <YAxis stroke="var(--app-chart-axis)" fontSize={12} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
             <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
             {Number.isFinite(cl) && (
               <ReferenceLine y={cl} stroke={stroke} strokeWidth={2} label={{ position: 'right', value: 'CL', fill: stroke, fontSize: 10, fontWeight: 'bold' }} />

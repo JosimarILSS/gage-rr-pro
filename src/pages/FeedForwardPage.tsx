@@ -14,12 +14,15 @@ import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import SidebarLayout from '../layouts/SidebarLayout';
 import Modal from '../components/common/Modal';
+import AppNavbar from '../components/common/AppNavbar';
 import { generateFeedForwardSession } from '../services/feed-forward';
-import type { Lang } from '../types/common';
+import type { AppTheme, Lang } from '../types/common';
 
 type FeedForwardPageProps = {
   lang: Lang;
+  appTheme: AppTheme;
   onToggleLang: () => void;
+  onToggleTheme: () => void;
   onBackToTools: () => void;
   getIdToken: () => Promise<string>;
 };
@@ -527,7 +530,9 @@ const addPdfPageNumbers = (state: PdfRenderState) => {
 
 export default function FeedForwardPage({
   lang,
+  appTheme,
   onToggleLang,
+  onToggleTheme,
   onBackToTools,
   getIdToken,
 }: FeedForwardPageProps) {
@@ -705,25 +710,6 @@ export default function FeedForwardPage({
 
   const sidebar = (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBackToTools}
-          className="app-button app-button-secondary px-3 py-2 text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {copy.back}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleLang}
-          className="app-button app-button-secondary px-3 py-2 text-sm"
-        >
-          <Globe className="w-4 h-4" />
-          {copy.language}
-        </button>
-      </div>
-
       <div>
         <div className="app-icon-tile app-icon-tile-lg app-icon-tile-warning">
           <MessageSquare className="w-6 h-6" />
@@ -880,6 +866,33 @@ export default function FeedForwardPage({
 
   return (
     <SidebarLayout
+      navbar={
+        <AppNavbar
+          lang={lang}
+          appTheme={appTheme}
+          onToggleTheme={onToggleTheme}
+          left={
+            <button
+              type="button"
+              onClick={onBackToTools}
+              className="app-button app-button-secondary px-3 py-2 text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {copy.back}
+            </button>
+          }
+          right={
+            <button
+              type="button"
+              onClick={onToggleLang}
+              className="app-button app-button-secondary px-3 py-2 text-sm"
+            >
+              <Globe className="w-4 h-4" />
+              {copy.language}
+            </button>
+          }
+        />
+      }
       sidebar={sidebar}
       sidebarClassName="md:w-[460px] lg:w-[520px]"
       mainClassName="bg-slate-50"

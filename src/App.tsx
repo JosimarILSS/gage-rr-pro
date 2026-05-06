@@ -10,7 +10,7 @@ import FeedForwardPage from './pages/FeedForwardPage';
 import AdminAccessGatePage from './pages/AdminAccessGatePage';
 import AdminUserAccessPage from './pages/AdminUserAccessPage';
 import { isToolEnabled } from './config/tools';
-import type { Lang } from './types/common';
+import type { AppTheme, Lang } from './types/common';
 
 const ADMIN_ROUTE = '/admin_user_access';
 const TOOLS_ROUTE = '/';
@@ -26,6 +26,12 @@ const parseAllowedAdminEmails = (rawValue?: string): string[] =>
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('es');
+  const [appTheme, setAppTheme] = useState<AppTheme>(() => {
+    const storedTheme = window.localStorage.getItem('app-theme');
+    const initialTheme: AppTheme = storedTheme === 'day' ? 'day' : 'night';
+    document.documentElement.dataset.theme = initialTheme;
+    return initialTheme;
+  });
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const authSession = useAuthSession(lang);
   const workspace = useGageRRWorkspace(lang);
@@ -35,6 +41,7 @@ export default function App() {
   );
 
   const toggleLang = () => setLang((current) => (current === 'es' ? 'en' : 'es'));
+  const toggleTheme = () => setAppTheme((current) => (current === 'night' ? 'day' : 'night'));
   const isAdminRoute = pathname === ADMIN_ROUTE;
   const isGageRRToolRoute = pathname === GAGE_RR_TOOL_ROUTE;
   const isSixSigmaToolRoute = pathname === SIX_SIGMA_TOOL_ROUTE;
@@ -70,6 +77,11 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = appTheme;
+    window.localStorage.setItem('app-theme', appTheme);
+  }, [appTheme]);
+
   const isAuthorizedAdminUser =
     allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
 
@@ -96,10 +108,12 @@ export default function App() {
       return (
         <AdminAccessGatePage
           lang={lang}
+          appTheme={appTheme}
           isAuthLoading={authSession.isAuthLoading}
           authError={authSession.authError}
           onGoogleLogin={authSession.handleLoginWithGoogle}
           onBackHome={() => navigateTo(TOOLS_ROUTE)}
+          onToggleTheme={toggleTheme}
         />
       );
     }
@@ -111,8 +125,10 @@ export default function App() {
     return (
       <AdminUserAccessPage
         adminEmail={authSession.user.email || ''}
+        appTheme={appTheme}
         onLogout={handleLogout}
         onBackHome={() => navigateTo(TOOLS_ROUTE)}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -121,12 +137,14 @@ export default function App() {
     return (
       <LoginPage
         lang={lang}
+        appTheme={appTheme}
         authError={authSession.authError}
         isAuthLoading={authSession.isAuthLoading}
         onGoogleLogin={authSession.handleLoginWithGoogle}
         onEmailLogin={authSession.handleLoginWithEmail}
         onEmailRegister={authSession.handleRegisterWithEmail}
         onToggleLang={toggleLang}
+        onToggleTheme={toggleTheme}
       />
     );
   }
@@ -135,7 +153,9 @@ export default function App() {
     return (
       <AnalysisPage
         lang={lang}
+        appTheme={appTheme}
         onToggleLang={toggleLang}
+        onToggleTheme={toggleTheme}
         userEmail={authSession.user.email}
         onLogout={handleLogout}
         esPremium={authSession.esPremium}
@@ -154,7 +174,9 @@ export default function App() {
     return (
       <SixSigmaPage
         lang={lang}
+        appTheme={appTheme}
         onToggleLang={toggleLang}
+        onToggleTheme={toggleTheme}
         onBackToTools={() => navigateTo(TOOLS_ROUTE)}
       />
     );
@@ -164,7 +186,9 @@ export default function App() {
     return (
       <FeedForwardPage
         lang={lang}
+        appTheme={appTheme}
         onToggleLang={toggleLang}
+        onToggleTheme={toggleTheme}
         onBackToTools={() => navigateTo(TOOLS_ROUTE)}
         getIdToken={() => authSession.user!.getIdToken()}
       />
@@ -174,7 +198,9 @@ export default function App() {
   return (
     <ToolsPage
       lang={lang}
+      appTheme={appTheme}
       onToggleLang={toggleLang}
+      onToggleTheme={toggleTheme}
       accountProfile={authSession.accountProfile}
       userEmail={authSession.user.email}
       userDisplayName={authSession.user.displayName}

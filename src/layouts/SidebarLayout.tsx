@@ -4,6 +4,7 @@ import { PanelLeft, X } from 'lucide-react';
 type SidebarLayoutProps = {
   sidebar: ReactNode;
   children: ReactNode;
+  navbar?: ReactNode;
   mainRef?: RefObject<HTMLDivElement | null>;
   mobileSidebarCollapsed?: boolean;
   sidebarClassName?: string;
@@ -13,6 +14,7 @@ type SidebarLayoutProps = {
 export default function SidebarLayout({
   sidebar,
   children,
+  navbar,
   mainRef,
   mobileSidebarCollapsed = false,
   sidebarClassName = '',
@@ -28,14 +30,17 @@ export default function SidebarLayout({
   }, [showSidebarOnlyOnMobile]);
 
   const mobileSidebarClass = showSidebarOnlyOnMobile
-    ? 'w-full h-screen overflow-y-auto'
+    ? 'w-full h-full overflow-y-auto'
     : `fixed top-0 left-0 h-screen w-[88vw] max-w-sm overflow-y-auto
        transition-transform duration-200 ease-out
        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
        shadow-xl`;
 
   return (
-    <div className="h-screen app-shell flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen app-shell flex flex-col overflow-hidden">
+      {navbar}
+
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
       {!showSidebarOnlyOnMobile && isMobileSidebarOpen && (
         <button
           id="print-sidebar-overlay"
@@ -48,7 +53,7 @@ export default function SidebarLayout({
 
       <div
         id="print-sidebar"
-        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-screen md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass} ${sidebarClassName}`}
+        className={`app-sidebar p-6 flex flex-col gap-6 z-30 shrink-0 md:w-80 md:h-full md:overflow-y-auto md:relative md:translate-x-0 ${mobileSidebarClass} ${sidebarClassName}`}
       >
         {!showSidebarOnlyOnMobile && (
           <button
@@ -83,6 +88,7 @@ export default function SidebarLayout({
           <PanelLeft className="w-5 h-5" />
         </button>
       )}
+      </div>
     </div>
   );
 }
