@@ -169,7 +169,6 @@ body,
   min-width: 190px;
   border-radius: var(--app-radius);
   background: var(--app-logo-bg);
-  border: 1px solid var(--app-logo-border);
   box-shadow: var(--app-logo-shadow);
   padding: 0.45rem 0.85rem;
 }
