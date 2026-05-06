@@ -43,7 +43,7 @@
   --app-header-bg: linear-gradient(90deg, #0e1628 0%, #142a64 52%, #233f93 100%);
   --app-header-border: #2c477f;
   --app-header-shadow: 0 10px 30px rgb(0 0 0 / 0.24);
-  --app-logo-bg: rgb(255 255 255 / 0.96);
+  --app-logo-bg: rgb(255 255 255 / 0);
   --app-logo-border: rgb(255 255 255 / 0.32);
   --app-logo-shadow: 0 12px 36px rgb(0 0 0 / 0.22);
 
