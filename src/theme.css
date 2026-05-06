@@ -190,9 +190,7 @@ body,
   justify-self: center;
   width: min(38vw, 360px);
   min-width: 190px;
-  border-radius: var(--app-radius);
   background: var(--app-logo-bg);
-  box-shadow: var(--app-logo-shadow);
   padding: 0.45rem 0.85rem;
 }
 
