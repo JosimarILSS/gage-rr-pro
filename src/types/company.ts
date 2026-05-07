@@ -1,3 +1,5 @@
+export type CompanyDefaultTheme = 'default' | 'night' | 'day';
+
 export type CompanyBrand = {
   id: string;
   name: string;
@@ -6,6 +8,7 @@ export type CompanyBrand = {
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  defaultTheme: CompanyDefaultTheme;
 };
 
 export const DEFAULT_COMPANY_COLORS = {
@@ -32,6 +35,9 @@ const normalizeColor = (value: unknown, fallback: string) =>
       ? value.trim()
       : fallback;
 
+export const normalizeCompanyDefaultTheme = (value: unknown): CompanyDefaultTheme =>
+  value === 'day' || value === 'night' ? value : 'default';
+
 export const normalizeCompanyBrand = (
   id: string,
   data: Record<string, unknown> | null | undefined
@@ -50,5 +56,6 @@ export const normalizeCompanyBrand = (
       data?.logoBackgroundColor,
       DEFAULT_COMPANY_COLORS.logoBackgroundColor
     ),
+    defaultTheme: normalizeCompanyDefaultTheme(data?.defaultTheme),
   };
 };

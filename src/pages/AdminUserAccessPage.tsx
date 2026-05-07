@@ -6,6 +6,7 @@ import {
   Image,
   KeyRound,
   LogOut,
+  Moon,
   Palette,
   Pencil,
   Plus,
@@ -13,6 +14,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Sun,
   Trash2,
   UserCog,
   UserPlus,
@@ -38,7 +40,7 @@ import { auth } from '../firebase';
 import { PLATFORM_TOOLS, buildDefaultToolFlags, normalizeToolFlags, type ToolFlags, type ToolId } from '../config/tools';
 import AppNavbar from '../components/common/AppNavbar';
 import type { AppTheme } from '../types/common';
-import { DEFAULT_COMPANY_COLORS } from '../types/company';
+import { DEFAULT_COMPANY_COLORS, type CompanyDefaultTheme } from '../types/company';
 
 type AdminUserAccessPageProps = {
   adminEmail: string;
@@ -74,6 +76,7 @@ type CompanyForm = {
   useDefaultLogoBackgroundColor: boolean;
   emailDomains: string[];
   emailDomainEnabled: boolean;
+  defaultTheme: CompanyDefaultTheme;
 };
 
 const LOGO_BACKGROUND_COLOR_PICKER_FALLBACK = '#ffffff';
@@ -101,6 +104,7 @@ const emptyCompanyForm = (): CompanyForm => ({
   useDefaultLogoBackgroundColor: true,
   emailDomains: [],
   emailDomainEnabled: false,
+  defaultTheme: 'default',
 });
 
 const companyToForm = (company: AdminCompany): CompanyForm => {
@@ -125,6 +129,7 @@ const companyToForm = (company: AdminCompany): CompanyForm => {
     useDefaultLogoBackgroundColor,
     emailDomains,
     emailDomainEnabled: company.emailDomainEnabled === true && emailDomains.length > 0,
+    defaultTheme: company.defaultTheme || 'default',
   };
 };
 
@@ -136,6 +141,12 @@ const normalizeCompanyFormDomains = (domains: string[]) =>
         .filter(Boolean)
     )
   );
+
+const getCompanyDefaultThemeLabel = (theme: CompanyDefaultTheme) => {
+  if (theme === 'day') return 'Dia';
+  if (theme === 'night') return 'Noche';
+  return 'Predeterminado (noche)';
+};
 
 const locale = 'es-MX';
 
@@ -580,6 +591,7 @@ export default function AdminUserAccessPage({
       emailDomains: normalizedEmailDomains,
       emailDomain: normalizedEmailDomains[0] || null,
       emailDomainEnabled: companyForm.emailDomainEnabled && normalizedEmailDomains.length > 0,
+      defaultTheme: companyForm.defaultTheme,
     };
   };
 
@@ -1260,6 +1272,14 @@ export default function AdminUserAccessPage({
                           ? emailDomains.map((domain) => `@${domain}`).join(', ')
                           : 'Dominio inactivo'}
                       </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        {company.defaultTheme === 'day' ? (
+                          <Sun className="w-3 h-3" />
+                        ) : (
+                          <Moon className="w-3 h-3" />
+                        )}
+                        {getCompanyDefaultThemeLabel(company.defaultTheme || 'default')}
+                      </span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
@@ -1459,6 +1479,45 @@ export default function AdminUserAccessPage({
             <p className="text-xs text-slate-500">
               Si esta inactivo o sin dominios, no se aplica ninguna asignacion automatica por dominio.
             </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Vista por default</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Define el modo visual inicial para usuarios de esta empresa.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { value: 'default' as const, label: 'Predeterminado', detail: 'Noche', icon: Moon },
+                { value: 'night' as const, label: 'Noche', detail: 'Oscuro', icon: Moon },
+                { value: 'day' as const, label: 'Dia', detail: 'Claro', icon: Sun },
+              ].map((option) => {
+                const Icon = option.icon;
+                const isSelected = companyForm.defaultTheme === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => updateCompanyForm('defaultTheme', option.value)}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                    aria-pressed={isSelected}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{option.label}</span>
+                      <span className="block text-xs opacity-75">{option.detail}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3">

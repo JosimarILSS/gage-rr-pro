@@ -14,6 +14,8 @@ const DEFAULT_COMPANY_COLORS = {
   logoBackgroundColor: 'transparent',
 };
 
+const normalizeDefaultTheme = (value) => (value === 'day' || value === 'night' ? value : 'default');
+
 const normalizeText = (value) => {
   if (typeof value !== 'string') return '';
   return value.trim();
@@ -108,6 +110,7 @@ const buildCompanyPayload = (body) => {
       emailDomain,
       emailDomainLower: emailDomain,
       emailDomainEnabled: emailDomainEnabled && emailDomains.length > 0,
+      defaultTheme: normalizeDefaultTheme(body?.defaultTheme),
       isActive: body?.isActive === false ? false : true,
     },
   };
@@ -134,6 +137,7 @@ const mapCompanyDoc = (docSnap) => {
     emailDomains,
     emailDomain: emailDomains[0] || null,
     emailDomainEnabled: data.emailDomainEnabled === true && emailDomains.length > 0,
+    defaultTheme: normalizeDefaultTheme(data.defaultTheme),
     isActive: data.isActive !== false,
     createdAt: toIsoOrNull(data.createdAt),
     updatedAt: toIsoOrNull(data.updatedAt),

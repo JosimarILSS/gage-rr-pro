@@ -29,6 +29,7 @@ type UseAuthSessionResult = {
   accountProfile: UserAccountProfile | null;
   signInProvider: string | null;
   loadingAuth: boolean;
+  loadingProfile: boolean;
   esPremium: boolean;
   authError: string | null;
   isAuthLoading: boolean;
@@ -51,6 +52,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   const [accountProfile, setAccountProfile] = useState<UserAccountProfile | null>(null);
   const [signInProvider, setSignInProvider] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const [esPremium, setEsPremium] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -78,10 +80,13 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
       if (!currentUser) {
         setAccountProfile(null);
         setSignInProvider(null);
+        setLoadingProfile(false);
         setEsPremium(false);
         setLoadingAuth(false);
         return;
       }
+
+      setLoadingProfile(true);
 
       try {
         const tokenResult = await currentUser.getIdTokenResult();
@@ -103,6 +108,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
         // Silencioso para no exponer detalles internos al cliente.
       } finally {
         await refreshAccountProfile(currentUser);
+        setLoadingProfile(false);
       }
     });
 
@@ -383,6 +389,7 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
     accountProfile,
     signInProvider,
     loadingAuth,
+    loadingProfile,
     esPremium,
     authError,
     isAuthLoading,

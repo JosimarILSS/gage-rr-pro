@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useAuthSession } from './hooks/useAuthSession';
 import { useGageRRWorkspace } from './hooks/useGageRRWorkspace';
 import LoadingPage from './pages/LoadingPage';
@@ -12,12 +12,17 @@ import AdminUserAccessPage from './pages/AdminUserAccessPage';
 import { isToolEnabled } from './config/tools';
 import { CompanyBrandProvider } from './contexts/CompanyBrandContext';
 import type { AppTheme, Lang } from './types/common';
+import type { CompanyBrand, CompanyDefaultTheme } from './types/company';
 
 const ADMIN_ROUTE = '/admin_user_access';
 const TOOLS_ROUTE = '/';
 const GAGE_RR_TOOL_ROUTE = '/tools/gage-rr';
 const SIX_SIGMA_TOOL_ROUTE = '/tools/six-sigma';
 const FEED_FORWARD_TOOL_ROUTE = '/tools/feed-forward';
+
+const resolveCompanyDefaultTheme = (
+  defaultTheme: CompanyDefaultTheme | null | undefined
+): AppTheme => (defaultTheme === 'day' ? 'day' : 'night');
 
 const parseAllowedAdminEmails = (rawValue?: string): string[] =>
   (rawValue || '')
@@ -34,6 +39,7 @@ export default function App() {
     return initialTheme;
   });
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [appliedCompanyThemeKey, setAppliedCompanyThemeKey] = useState<string | null>(null);
   const authSession = useAuthSession(lang);
   const workspace = useGageRRWorkspace(lang);
   const allowedAdminEmails = useMemo(
@@ -78,10 +84,48 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  useEffect(() => {
+  const activeCompanyBrand: CompanyBrand | null =
+    !isAdminRoute && authSession.user ? authSession.accountProfile?.companyBrand || null : null;
+  const activeCompanyThemeKey = activeCompanyBrand
+    ? `${activeCompanyBrand.id}:${activeCompanyBrand.defaultTheme}`
+    : null;
+  const isApplyingCompanyTheme =
+    !!activeCompanyBrand &&
+    !authSession.loadingProfile &&
+    appliedCompanyThemeKey !== activeCompanyThemeKey;
+  const isLoadingUserInterface =
+    authSession.loadingAuth || (!!authSession.user && (authSession.loadingProfile || isApplyingCompanyTheme));
+
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = appTheme;
     window.localStorage.setItem('app-theme', appTheme);
   }, [appTheme]);
+
+  useEffect(() => {
+    if (!authSession.user || isAdminRoute) {
+      setAppliedCompanyThemeKey(null);
+      return;
+    }
+
+    if (authSession.loadingProfile) return;
+
+    if (!activeCompanyBrand || !activeCompanyThemeKey) {
+      setAppliedCompanyThemeKey(null);
+      return;
+    }
+
+    if (appliedCompanyThemeKey === activeCompanyThemeKey) return;
+
+    setAppTheme(resolveCompanyDefaultTheme(activeCompanyBrand.defaultTheme));
+    setAppliedCompanyThemeKey(activeCompanyThemeKey);
+  }, [
+    activeCompanyBrand,
+    activeCompanyThemeKey,
+    appliedCompanyThemeKey,
+    authSession.loadingProfile,
+    authSession.user,
+    isAdminRoute,
+  ]);
 
   const isAuthorizedAdminUser =
     allowedAdminEmails.includes(loggedEmail) && authSession.signInProvider === 'google.com';
@@ -101,7 +145,7 @@ export default function App() {
   }, [hasBlockedToolRoute]);
 
   const renderContent = () => {
-    if (authSession.loadingAuth) {
+    if (isLoadingUserInterface) {
       return <LoadingPage />;
     }
 
@@ -224,7 +268,7 @@ export default function App() {
   };
 
   return (
-    <CompanyBrandProvider brand={isAdminRoute ? null : authSession.accountProfile?.companyBrand || null}>
+    <CompanyBrandProvider brand={activeCompanyBrand}>
       {renderContent()}
     </CompanyBrandProvider>
   );

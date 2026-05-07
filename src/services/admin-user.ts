@@ -1,4 +1,5 @@
 import type { ToolFlags } from '../config/tools';
+import type { CompanyDefaultTheme } from '../types/company';
 
 type AdminPremiumMonthAction = 'add' | 'subtract' | 'set';
 
@@ -27,6 +28,7 @@ type AdminCompany = {
   emailDomains: string[];
   emailDomain: string | null;
   emailDomainEnabled: boolean;
+  defaultTheme: CompanyDefaultTheme;
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -42,6 +44,7 @@ type CreateAdminCompanyPayload = {
   emailDomains?: string[];
   emailDomain?: string | null;
   emailDomainEnabled?: boolean;
+  defaultTheme?: CompanyDefaultTheme;
 };
 
 type UpdateAdminCompanyPayload = CreateAdminCompanyPayload & {
