@@ -11,7 +11,7 @@ export type CompanyBrand = {
 export const DEFAULT_COMPANY_COLORS = {
   primaryColor: '#2476ff',
   headerColor: '#0e1628',
-  logoBackgroundColor: '#ffffff',
+  logoBackgroundColor: 'transparent',
 };
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -26,7 +26,11 @@ const normalizeText = (value: unknown): string | null => {
 };
 
 const normalizeColor = (value: unknown, fallback: string) =>
-  isHexColor(value) ? value.trim() : fallback;
+  fallback === 'transparent' && typeof value === 'string' && value.trim().toLowerCase() === 'transparent'
+    ? 'transparent'
+    : isHexColor(value)
+      ? value.trim()
+      : fallback;
 
 export const normalizeCompanyBrand = (
   id: string,

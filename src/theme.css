@@ -16,6 +16,7 @@
   --app-primary-soft: #15345f;
   --app-primary-border: #2e63b7;
   --app-primary-text: #9dcbff;
+  --app-primary-contrast: #ffffff;
 
   --app-success: #34d399;
   --app-success-soft: #0f332c;
@@ -41,6 +42,7 @@
   --app-chart-axis: #86a1c5;
 
   --app-header-bg: linear-gradient(90deg, #0e1628 0%, #142a64 52%, #233f93 100%);
+  --app-header-text: var(--app-text);
   --app-header-border: #2c477f;
   --app-header-shadow: 0 10px 30px rgb(0 0 0 / 0.24);
   --app-logo-bg: rgb(255 255 255 / 0);
@@ -71,6 +73,7 @@
   --app-primary-soft: #d5f2ff;
   --app-primary-border: #b4e8ff;
   --app-primary-text: #0083bc;
+  --app-primary-contrast: #ffffff;
 
   --app-success: #059669;
   --app-success-soft: #ecfdf5;
@@ -96,6 +99,7 @@
   --app-chart-axis: #94a3b8;
 
   --app-header-bg: var(--app-surface);
+  --app-header-text: var(--app-text);
   --app-header-border: var(--app-border);
   --app-header-shadow: var(--app-shadow);
   --app-logo-bg: #ffffff;
@@ -147,6 +151,7 @@ body,
   background: var(--app-header-bg);
   border-bottom: 1px solid var(--app-header-border);
   box-shadow: var(--app-header-shadow);
+  color: var(--app-header-text);
 }
 
 .app-navbar {
@@ -184,6 +189,20 @@ body,
 .app-navbar-right > * {
   min-width: 0;
   max-width: 100%;
+}
+
+.app-header .app-navbar-left :where(.app-title, .app-muted) {
+  color: var(--app-header-text);
+}
+
+.app-header .app-navbar-left .app-muted {
+  opacity: 0.78;
+}
+
+.app-header .app-navbar-left .app-icon-tile {
+  background: color-mix(in srgb, var(--app-header-text) 12%, transparent);
+  color: var(--app-header-text);
+  border-color: color-mix(in srgb, var(--app-header-text) 28%, transparent);
 }
 
 .app-navbar-brand {
@@ -234,7 +253,7 @@ body,
 
 .app-theme-switch-option.is-active {
   background: var(--app-primary);
-  color: white;
+  color: var(--app-primary-contrast);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--app-primary) 26%, transparent);
 }
 
@@ -438,7 +457,7 @@ body,
 
 .app-button-primary {
   background: var(--app-primary);
-  color: white;
+  color: var(--app-primary-contrast);
   border: 1px solid var(--app-primary);
 }
 

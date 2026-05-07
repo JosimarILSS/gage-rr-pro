@@ -34,20 +34,47 @@ const ensureAuthorizedAdmin = async (req, res) => {
   return decodedToken;
 };
 
-const ensureUniqueActiveDomain = async (db, emailDomain, currentCompanyId = null) => {
-  if (!emailDomain) return null;
-
+const findActiveCompanyByDomainQuery = async (db, queryField, operator, emailDomain, currentCompanyId) => {
   const snap = await db
     .collection(COMPANIES_COLLECTION)
-    .where('emailDomainLower', '==', emailDomain)
+    .where(queryField, operator, emailDomain)
     .limit(5)
     .get();
 
   const conflictingDoc = snap.docs.find((docSnap) => {
     const data = docSnap.data() || {};
-    return docSnap.id !== currentCompanyId && data.emailDomainEnabled === true;
+    return (
+      docSnap.id !== currentCompanyId &&
+      data.emailDomainEnabled === true &&
+      data.isActive !== false
+    );
   });
+
   return conflictingDoc ? mapCompanyDoc(conflictingDoc) : null;
+};
+
+const ensureUniqueActiveDomains = async (db, emailDomains, currentCompanyId = null) => {
+  for (const emailDomain of emailDomains) {
+    const arrayConflict = await findActiveCompanyByDomainQuery(
+      db,
+      'emailDomainsLower',
+      'array-contains',
+      emailDomain,
+      currentCompanyId
+    );
+    if (arrayConflict) return { company: arrayConflict, emailDomain };
+
+    const legacyConflict = await findActiveCompanyByDomainQuery(
+      db,
+      'emailDomainLower',
+      '==',
+      emailDomain,
+      currentCompanyId
+    );
+    if (legacyConflict) return { company: legacyConflict, emailDomain };
+  }
+
+  return null;
 };
 
 module.exports = async function handler(req, res) {
@@ -160,10 +187,10 @@ module.exports = async function handler(req, res) {
       }
 
       if (payload.emailDomainEnabled) {
-        const conflict = await ensureUniqueActiveDomain(db, payload.emailDomain, companyId);
+        const conflict = await ensureUniqueActiveDomains(db, payload.emailDomains, companyId);
         if (conflict) {
           res.status(409).json({
-            error: `Domain already assigned to ${conflict.name}.`,
+            error: `Domain @${conflict.emailDomain} already assigned to ${conflict.company.name}.`,
           });
           return;
         }
@@ -184,10 +211,10 @@ module.exports = async function handler(req, res) {
     }
 
     if (payload.emailDomainEnabled) {
-      const conflict = await ensureUniqueActiveDomain(db, payload.emailDomain);
+      const conflict = await ensureUniqueActiveDomains(db, payload.emailDomains);
       if (conflict) {
         res.status(409).json({
-          error: `Domain already assigned to ${conflict.name}.`,
+          error: `Domain @${conflict.emailDomain} already assigned to ${conflict.company.name}.`,
         });
         return;
       }

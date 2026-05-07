@@ -64,18 +64,29 @@ const findCompanyIdByEmailDomain = async (db, email) => {
   const emailDomain = getEmailDomain(email);
   if (!emailDomain) return null;
 
-  const snap = await db
+  const findActiveMatch = (snap) =>
+    snap.docs.find((docSnap) => {
+      const data = docSnap.data() || {};
+      return data.emailDomainEnabled === true && data.isActive !== false;
+    });
+
+  const arraySnap = await db
+    .collection(COMPANIES_COLLECTION)
+    .where('emailDomainsLower', 'array-contains', emailDomain)
+    .limit(5)
+    .get();
+  const arrayMatch = findActiveMatch(arraySnap);
+  if (arrayMatch) return arrayMatch.id;
+
+  const legacySnap = await db
     .collection(COMPANIES_COLLECTION)
     .where('emailDomainLower', '==', emailDomain)
     .limit(5)
     .get();
 
-  const match = snap.docs.find((docSnap) => {
-    const data = docSnap.data() || {};
-    return data.emailDomainEnabled === true && data.isActive !== false;
-  });
+  const legacyMatch = findActiveMatch(legacySnap);
 
-  return match ? match.id : null;
+  return legacyMatch ? legacyMatch.id : null;
 };
 
 /**

@@ -72,9 +72,11 @@ type CompanyForm = {
   useDefaultPrimaryColor: boolean;
   useDefaultHeaderColor: boolean;
   useDefaultLogoBackgroundColor: boolean;
-  emailDomain: string;
+  emailDomains: string[];
   emailDomainEnabled: boolean;
 };
+
+const LOGO_BACKGROUND_COLOR_PICKER_FALLBACK = '#ffffff';
 
 const emptyUserForm = (): UserEditorForm => ({
   email: '',
@@ -93,29 +95,47 @@ const emptyCompanyForm = (): CompanyForm => ({
   logoAlt: '',
   primaryColor: DEFAULT_COMPANY_COLORS.primaryColor,
   headerColor: DEFAULT_COMPANY_COLORS.headerColor,
-  logoBackgroundColor: DEFAULT_COMPANY_COLORS.logoBackgroundColor,
+  logoBackgroundColor: LOGO_BACKGROUND_COLOR_PICKER_FALLBACK,
   useDefaultPrimaryColor: true,
   useDefaultHeaderColor: true,
   useDefaultLogoBackgroundColor: true,
-  emailDomain: '',
+  emailDomains: [],
   emailDomainEnabled: false,
 });
 
-const companyToForm = (company: AdminCompany): CompanyForm => ({
-  name: company.name,
-  noLogo: !company.logoUrl,
-  logoUrl: company.logoUrl || '',
-  logoAlt: company.logoAlt || '',
-  primaryColor: company.primaryColor || DEFAULT_COMPANY_COLORS.primaryColor,
-  headerColor: company.headerColor || DEFAULT_COMPANY_COLORS.headerColor,
-  logoBackgroundColor: company.logoBackgroundColor || DEFAULT_COMPANY_COLORS.logoBackgroundColor,
-  useDefaultPrimaryColor: company.primaryColor === DEFAULT_COMPANY_COLORS.primaryColor,
-  useDefaultHeaderColor: company.headerColor === DEFAULT_COMPANY_COLORS.headerColor,
-  useDefaultLogoBackgroundColor:
-    company.logoBackgroundColor === DEFAULT_COMPANY_COLORS.logoBackgroundColor,
-  emailDomain: company.emailDomain || '',
-  emailDomainEnabled: company.emailDomainEnabled === true && !!company.emailDomain,
-});
+const companyToForm = (company: AdminCompany): CompanyForm => {
+  const logoBackgroundColor = company.logoBackgroundColor || DEFAULT_COMPANY_COLORS.logoBackgroundColor;
+  const useDefaultLogoBackgroundColor =
+    logoBackgroundColor === DEFAULT_COMPANY_COLORS.logoBackgroundColor;
+  const emailDomains =
+    company.emailDomains?.length ? company.emailDomains : company.emailDomain ? [company.emailDomain] : [];
+
+  return {
+    name: company.name,
+    noLogo: !company.logoUrl,
+    logoUrl: company.logoUrl || '',
+    logoAlt: company.logoAlt || '',
+    primaryColor: company.primaryColor || DEFAULT_COMPANY_COLORS.primaryColor,
+    headerColor: company.headerColor || DEFAULT_COMPANY_COLORS.headerColor,
+    logoBackgroundColor: useDefaultLogoBackgroundColor
+      ? LOGO_BACKGROUND_COLOR_PICKER_FALLBACK
+      : logoBackgroundColor,
+    useDefaultPrimaryColor: company.primaryColor === DEFAULT_COMPANY_COLORS.primaryColor,
+    useDefaultHeaderColor: company.headerColor === DEFAULT_COMPANY_COLORS.headerColor,
+    useDefaultLogoBackgroundColor,
+    emailDomains,
+    emailDomainEnabled: company.emailDomainEnabled === true && emailDomains.length > 0,
+  };
+};
+
+const normalizeCompanyFormDomains = (domains: string[]) =>
+  Array.from(
+    new Set(
+      domains
+        .map((domain) => domain.trim().toLowerCase().replace(/^@+/, ''))
+        .filter(Boolean)
+    )
+  );
 
 const locale = 'es-MX';
 
@@ -308,16 +328,44 @@ export default function AdminUserAccessPage({
     setCompanyForm((current) => ({ ...current, [key]: value }));
   };
 
+  const addCompanyEmailDomain = () => {
+    setCompanyForm((current) => ({
+      ...current,
+      emailDomains: [...current.emailDomains, ''],
+    }));
+  };
+
+  const updateCompanyEmailDomain = (index: number, value: string) => {
+    setCompanyForm((current) => ({
+      ...current,
+      emailDomains: current.emailDomains.map((domain, domainIndex) =>
+        domainIndex === index ? value.trim().toLowerCase().replace(/^@+/, '') : domain
+      ),
+    }));
+  };
+
+  const removeCompanyEmailDomain = (index: number) => {
+    setCompanyForm((current) => ({
+      ...current,
+      emailDomains: current.emailDomains.filter((_, domainIndex) => domainIndex !== index),
+    }));
+  };
+
   const setCompanyColorDefault = (
     colorKey: 'primaryColor' | 'headerColor' | 'logoBackgroundColor',
     defaultKey: 'useDefaultPrimaryColor' | 'useDefaultHeaderColor' | 'useDefaultLogoBackgroundColor',
     defaultColor: string,
     enabled: boolean
   ) => {
+    const fallbackColor =
+      defaultColor === DEFAULT_COMPANY_COLORS.logoBackgroundColor
+        ? LOGO_BACKGROUND_COLOR_PICKER_FALLBACK
+        : defaultColor;
+
     setCompanyForm((current) => ({
       ...current,
       [defaultKey]: enabled,
-      [colorKey]: enabled ? defaultColor : current[colorKey],
+      [colorKey]: enabled ? fallbackColor : current[colorKey],
     }));
   };
 
@@ -501,7 +549,7 @@ export default function AdminUserAccessPage({
     const normalizedName = companyForm.name.trim();
     const normalizedLogoUrl = companyForm.noLogo ? '' : companyForm.logoUrl.trim();
     const normalizedLogoAlt = companyForm.noLogo ? '' : companyForm.logoAlt.trim();
-    const normalizedEmailDomain = companyForm.emailDomain.trim().toLowerCase().replace(/^@+/, '');
+    const normalizedEmailDomains = normalizeCompanyFormDomains(companyForm.emailDomains);
     const primaryColor = companyForm.useDefaultPrimaryColor
       ? DEFAULT_COMPANY_COLORS.primaryColor
       : companyForm.primaryColor;
@@ -517,8 +565,8 @@ export default function AdminUserAccessPage({
       return null;
     }
 
-    if (companyForm.emailDomainEnabled && !normalizedEmailDomain) {
-      setError('Ingresa un dominio de correo o desactiva la regla automatica.');
+    if (companyForm.emailDomainEnabled && normalizedEmailDomains.length === 0) {
+      setError('Agrega por lo menos un dominio de correo o desactiva la regla automatica.');
       return null;
     }
 
@@ -529,8 +577,9 @@ export default function AdminUserAccessPage({
       primaryColor,
       headerColor,
       logoBackgroundColor,
-      emailDomain: normalizedEmailDomain || null,
-      emailDomainEnabled: companyForm.emailDomainEnabled && !!normalizedEmailDomain,
+      emailDomains: normalizedEmailDomains,
+      emailDomain: normalizedEmailDomains[0] || null,
+      emailDomainEnabled: companyForm.emailDomainEnabled && normalizedEmailDomains.length > 0,
     };
   };
 
@@ -1157,7 +1206,15 @@ export default function AdminUserAccessPage({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {companies.map((company) => (
+            {companies.map((company) => {
+              const emailDomains =
+                company.emailDomains?.length
+                  ? company.emailDomains
+                  : company.emailDomain
+                    ? [company.emailDomain]
+                    : [];
+
+              return (
               <div key={company.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
                 <div className="flex items-start gap-3">
                   <div
@@ -1194,13 +1251,13 @@ export default function AdminUserAccessPage({
                       </span>
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs border rounded-lg px-2 py-1 bg-white ${
-                          company.emailDomainEnabled && company.emailDomain
+                          company.emailDomainEnabled && emailDomains.length > 0
                             ? 'text-emerald-700 border-emerald-200'
                             : 'text-slate-500 border-slate-200'
                         }`}
                       >
-                        {company.emailDomainEnabled && company.emailDomain
-                          ? `@${company.emailDomain}`
+                        {company.emailDomainEnabled && emailDomains.length > 0
+                          ? emailDomains.map((domain) => `@${domain}`).join(', ')
                           : 'Dominio inactivo'}
                       </span>
                     </div>
@@ -1226,7 +1283,8 @@ export default function AdminUserAccessPage({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1353,27 +1411,53 @@ export default function AdminUserAccessPage({
               </label>
             </div>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-600">Dominio</span>
-              <div className="flex items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
-                <span className="text-sm font-semibold text-slate-400">@</span>
-                <input
-                  type="text"
-                  value={companyForm.emailDomain}
-                  onChange={(event) =>
-                    updateCompanyForm(
-                      'emailDomain',
-                      event.target.value.trim().toLowerCase().replace(/^@+/, '')
-                    )
-                  }
-                  placeholder="bimbo.mx"
-                  className="w-full bg-transparent outline-none text-sm"
-                />
-              </div>
-            </label>
+            <div className="space-y-2">
+              {companyForm.emailDomains.length === 0 ? (
+                <div className="text-xs text-slate-500 border border-dashed border-slate-300 rounded-xl p-3">
+                  No hay dominios agregados.
+                </div>
+              ) : (
+                companyForm.emailDomains.map((domain, index) => (
+                  <label key={index} className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-slate-600">
+                      Dominio {index + 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 border border-slate-300 rounded-xl px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-300">
+                        <span className="text-sm font-semibold text-slate-400">@</span>
+                        <input
+                          type="text"
+                          value={domain}
+                          onChange={(event) => updateCompanyEmailDomain(index, event.target.value)}
+                          placeholder="bimbo.mx"
+                          className="w-full bg-transparent outline-none text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCompanyEmailDomain(index)}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                        aria-label={`Quitar dominio ${index + 1}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={addCompanyEmailDomain}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              <Plus className="w-4 h-4" />
+              Agregar dominio
+            </button>
 
             <p className="text-xs text-slate-500">
-              Si esta inactivo o vacio, no se aplica ninguna asignacion automatica por dominio.
+              Si esta inactivo o sin dominios, no se aplica ninguna asignacion automatica por dominio.
             </p>
           </div>
 
@@ -1435,7 +1519,14 @@ export default function AdminUserAccessPage({
     defaultColor: string
   ) => {
     const usesDefault = companyForm[defaultKey];
-    const colorValue = usesDefault ? defaultColor : companyForm[colorKey];
+    const isTransparentDefault =
+      usesDefault && defaultColor === DEFAULT_COMPANY_COLORS.logoBackgroundColor;
+    const rawColorValue = usesDefault ? defaultColor : companyForm[colorKey];
+    const colorValue =
+      rawColorValue === DEFAULT_COMPANY_COLORS.logoBackgroundColor
+        ? LOGO_BACKGROUND_COLOR_PICKER_FALLBACK
+        : rawColorValue;
+    const visibleLabel = isTransparentDefault ? 'TRANSPARENTE' : colorValue.toUpperCase();
 
     return (
       <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3">
@@ -1453,7 +1544,7 @@ export default function AdminUserAccessPage({
             Predeterminado
           </label>
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2 items-center">
+        <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2 items-center">
           <input
             type="color"
             value={colorValue}
@@ -1462,7 +1553,7 @@ export default function AdminUserAccessPage({
             className="h-11 w-full border border-slate-300 rounded-xl bg-white p-1 disabled:opacity-60"
           />
           <span className="text-xs font-semibold text-slate-500 text-right tabular-nums">
-            {colorValue.toUpperCase()}
+            {visibleLabel}
           </span>
         </div>
       </div>

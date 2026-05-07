@@ -24,6 +24,7 @@ type AdminCompany = {
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  emailDomains: string[];
   emailDomain: string | null;
   emailDomainEnabled: boolean;
   isActive: boolean;
@@ -38,6 +39,7 @@ type CreateAdminCompanyPayload = {
   primaryColor: string;
   headerColor: string;
   logoBackgroundColor: string;
+  emailDomains?: string[];
   emailDomain?: string | null;
   emailDomainEnabled?: boolean;
 };
