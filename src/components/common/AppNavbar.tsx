@@ -26,10 +26,12 @@ export default function AppNavbar({
   const brandName = companyBrand?.name || 'International Lean Six Sigma Group';
   const logoSrc = companyBrand?.logoUrl || defaultLogoSrc;
   const logoAlt = companyBrand?.logoAlt || brandName;
+  const hasCustomLogo = !!companyBrand?.logoUrl;
   const brandClassName =
-    !companyBrand?.logoUrl && isNight
-      ? 'app-navbar-brand app-navbar-brand-night'
-      : 'app-navbar-brand';
+    `app-navbar-brand${hasCustomLogo ? ' app-navbar-brand-custom' : ''}${
+      !hasCustomLogo && isNight ? ' app-navbar-brand-night' : ''
+    }`;
+  const logoClassName = `app-navbar-logo${hasCustomLogo ? ' app-navbar-logo-custom' : ''}`;
   const toggleLabel =
     lang === 'es'
       ? `Cambiar a modo ${isNight ? 'día' : 'noche'}`
@@ -41,7 +43,7 @@ export default function AppNavbar({
         <div className="app-navbar-left">{left}</div>
 
         <div className={brandClassName} aria-label={brandName}>
-          <img src={logoSrc} alt={logoAlt} className="app-navbar-logo" />
+          <img src={logoSrc} alt={logoAlt} className={logoClassName} />
         </div>
 
         <div className="app-navbar-right">
