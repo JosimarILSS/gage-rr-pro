@@ -237,7 +237,10 @@ export default function ToolsPage({
               <p className="text-sm app-muted flex min-w-0 flex-wrap items-center gap-x-2">
                 <span>{copy.appName}</span>
                 {companyBrand?.name && (
-                  <span className="app-company-inline-name truncate">{companyBrand.name}</span>
+                  <>
+                    <span className="app-company-inline-separator" aria-hidden="true">·</span>
+                    <span className="app-company-inline-name truncate">{companyBrand.name}</span>
+                  </>
                 )}
               </p>
               <h1 className="text-2xl app-title">{copy.toolsTitle}</h1>

@@ -73,12 +73,12 @@ const applyBrandCssVariables = (brand: CompanyBrand | null) => {
   );
   rootStyle.setProperty('--app-primary-text', brand.primaryColor);
   rootStyle.setProperty('--app-primary-contrast', primaryContrast);
-  rootStyle.setProperty('--app-secondary', brand.headerColor);
+  rootStyle.setProperty('--app-secondary', brand.primaryColor);
   rootStyle.setProperty(
     '--app-secondary-border',
-    `color-mix(in srgb, ${brand.headerColor} 55%, var(--app-border))`
+    `color-mix(in srgb, ${brand.primaryColor} 55%, var(--app-border))`
   );
-  rootStyle.setProperty('--app-secondary-contrast', headerText);
+  rootStyle.setProperty('--app-secondary-contrast', primaryContrast);
   rootStyle.setProperty('--app-header-bg', brand.headerColor);
   rootStyle.setProperty('--app-header-text', headerText);
   rootStyle.setProperty('--app-logo-bg', logoBackground);

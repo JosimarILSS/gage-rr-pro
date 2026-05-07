@@ -480,7 +480,7 @@ body,
 }
 
 .app-header .app-navbar-left .app-icon-tile {
-  background: color-mix(in srgb, var(--app-secondary) 18%, var(--app-secondary-contrast));
+  background: color-mix(in srgb, var(--app-secondary) 18%, var(--app-surface));
   color: var(--app-secondary);
   border: 2px solid var(--app-secondary);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--app-secondary) 18%, transparent);
@@ -496,6 +496,12 @@ body,
   max-width: min(15rem, 100%);
   color: var(--app-secondary);
   font-weight: 800;
+}
+
+.app-company-inline-separator {
+  color: var(--app-header-text);
+  font-weight: 800;
+  opacity: 0.65;
 }
 
 .app-navbar-brand {
