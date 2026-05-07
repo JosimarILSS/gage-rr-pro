@@ -480,9 +480,17 @@ body,
 }
 
 .app-header .app-navbar-left .app-icon-tile {
-  background: color-mix(in srgb, var(--app-header-text) 14%, transparent);
+  background: color-mix(in srgb, var(--app-secondary) 18%, var(--app-surface));
   color: var(--app-secondary);
-  border-color: var(--app-secondary-border);
+  border-color: var(--app-secondary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-secondary) 22%, transparent);
+}
+
+.app-company-inline-name {
+  min-width: 0;
+  max-width: min(15rem, 100%);
+  color: var(--app-secondary);
+  font-weight: 800;
 }
 
 .app-navbar-brand {

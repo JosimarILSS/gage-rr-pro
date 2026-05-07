@@ -1490,7 +1490,7 @@ export default function AdminUserAccessPage({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
-                { value: 'default' as const, label: 'Predeterminado', detail: 'Noche', icon: Moon },
+                { value: 'default' as const, label: 'Por defecto', detail: 'Noche', icon: Moon },
                 { value: 'night' as const, label: 'Noche', detail: 'Oscuro', icon: Moon },
                 { value: 'day' as const, label: 'Dia', detail: 'Claro', icon: Sun },
               ].map((option) => {
@@ -1502,7 +1502,7 @@ export default function AdminUserAccessPage({
                     key={option.value}
                     type="button"
                     onClick={() => updateCompanyForm('defaultTheme', option.value)}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                    className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                       isSelected
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -1511,7 +1511,9 @@ export default function AdminUserAccessPage({
                   >
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{option.label}</span>
+                      <span className="block text-sm font-semibold leading-tight whitespace-normal break-words">
+                        {option.label}
+                      </span>
                       <span className="block text-xs opacity-75">{option.detail}</span>
                     </span>
                   </button>

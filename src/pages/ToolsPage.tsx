@@ -18,6 +18,7 @@ import {
 import type { UserAccountProfile } from '../services/auth';
 import { isToolEnabled, type ToolFlags, type ToolId } from '../config/tools';
 import AppNavbar from '../components/common/AppNavbar';
+import { useCompanyBrand } from '../contexts/CompanyBrandContext';
 import type { AppTheme, Lang } from '../types/common';
 
 type ToolsPageProps = {
@@ -89,6 +90,7 @@ export default function ToolsPage({
   showAdminAccessButton = false,
   onGoToAdminAccess,
 }: ToolsPageProps) {
+  const companyBrand = useCompanyBrand();
   const copy = {
     es: {
       appName: 'ILSS Labs',
@@ -232,7 +234,12 @@ export default function ToolsPage({
               <Wrench className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm app-muted">{copy.appName}</p>
+              <p className="text-sm app-muted flex min-w-0 flex-wrap items-center gap-x-2">
+                <span>{copy.appName}</span>
+                {companyBrand?.name && (
+                  <span className="app-company-inline-name truncate">{companyBrand.name}</span>
+                )}
+              </p>
               <h1 className="text-2xl app-title">{copy.toolsTitle}</h1>
             </div>
           </div>
