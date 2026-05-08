@@ -77,6 +77,8 @@ type CompanyForm = {
   emailDomains: string[];
   emailDomainEnabled: boolean;
   defaultTheme: CompanyDefaultTheme;
+  defaultToolAccess: ToolFlags;
+  defaultPremiumTools: ToolFlags;
 };
 
 const LOGO_BACKGROUND_COLOR_PICKER_FALLBACK = '#ffffff';
@@ -105,6 +107,8 @@ const emptyCompanyForm = (): CompanyForm => ({
   emailDomains: [],
   emailDomainEnabled: false,
   defaultTheme: 'default',
+  defaultToolAccess: buildDefaultToolFlags(true),
+  defaultPremiumTools: buildDefaultToolFlags(true),
 });
 
 const companyToForm = (company: AdminCompany): CompanyForm => {
@@ -130,6 +134,8 @@ const companyToForm = (company: AdminCompany): CompanyForm => {
     emailDomains,
     emailDomainEnabled: company.emailDomainEnabled === true && emailDomains.length > 0,
     defaultTheme: company.defaultTheme || 'default',
+    defaultToolAccess: normalizeToolFlags(company.defaultToolAccess, true),
+    defaultPremiumTools: normalizeToolFlags(company.defaultPremiumTools, true),
   };
 };
 
@@ -362,6 +368,20 @@ export default function AdminUserAccessPage({
     }));
   };
 
+  const applyCompanyDefaultsToUserForm = (
+    updateForm: <K extends keyof UserEditorForm>(key: K, value: UserEditorForm[K]) => void,
+    companyId: string | null
+  ) => {
+    updateForm('companyId', companyId);
+    if (!companyId) return;
+
+    const selectedCompany = companyById.get(companyId);
+    if (!selectedCompany) return;
+
+    updateForm('toolAccess', normalizeToolFlags(selectedCompany.defaultToolAccess, true));
+    updateForm('premiumTools', normalizeToolFlags(selectedCompany.defaultPremiumTools, true));
+  };
+
   const setCompanyColorDefault = (
     colorKey: 'primaryColor' | 'headerColor' | 'logoBackgroundColor',
     defaultKey: 'useDefaultPrimaryColor' | 'useDefaultHeaderColor' | 'useDefaultLogoBackgroundColor',
@@ -592,6 +612,8 @@ export default function AdminUserAccessPage({
       emailDomain: normalizedEmailDomains[0] || null,
       emailDomainEnabled: companyForm.emailDomainEnabled && normalizedEmailDomains.length > 0,
       defaultTheme: companyForm.defaultTheme,
+      defaultToolAccess: companyForm.defaultToolAccess,
+      defaultPremiumTools: companyForm.defaultPremiumTools,
     };
   };
 
@@ -825,7 +847,9 @@ export default function AdminUserAccessPage({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px] gap-4 items-start">
-        {renderCompanySelect(form.companyId, (nextCompanyId) => updateForm('companyId', nextCompanyId))}
+        {renderCompanySelect(form.companyId, (nextCompanyId) =>
+          applyCompanyDefaultsToUserForm(updateForm, nextCompanyId)
+        )}
 
         <div className="grid grid-cols-1 gap-3">
           <label className="flex flex-col gap-1.5">
@@ -1280,6 +1304,14 @@ export default function AdminUserAccessPage({
                         )}
                         {getCompanyDefaultThemeLabel(company.defaultTheme || 'default')}
                       </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        <KeyRound className="w-3 h-3" />
+                        Herr: {summarizeTools(normalizeToolFlags(company.defaultToolAccess, true))}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        <ShieldCheck className="w-3 h-3" />
+                        Premium: {summarizeTools(normalizeToolFlags(company.defaultPremiumTools, true))}
+                      </span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
@@ -1520,6 +1552,40 @@ export default function AdminUserAccessPage({
                 );
               })}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div className="flex items-start gap-2">
+              <KeyRound className="w-4 h-4 text-indigo-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Herramientas disponibles por default
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Se aplican al crear usuarios de esta empresa; el usuario puede tener override.
+                </p>
+              </div>
+            </div>
+            {renderToolCheckboxes(companyForm.defaultToolAccess, (next) =>
+              updateCompanyForm('defaultToolAccess', next)
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Beneficio premium por default
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Define que herramientas reciben beneficio premium por empresa.
+                </p>
+              </div>
+            </div>
+            {renderToolCheckboxes(companyForm.defaultPremiumTools, (next) =>
+              updateCompanyForm('defaultPremiumTools', next)
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-3">

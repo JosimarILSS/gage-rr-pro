@@ -89,6 +89,29 @@ const findCompanyIdByEmailDomain = async (db, email) => {
   return legacyMatch ? legacyMatch.id : null;
 };
 
+const getCompanyAccessDefaults = async (db, companyId) => {
+  if (!companyId) {
+    return {
+      toolAccess: buildDefaultToolFlags(true),
+      premiumTools: buildDefaultToolFlags(true),
+    };
+  }
+
+  try {
+    const companySnap = await db.collection(COMPANIES_COLLECTION).doc(companyId).get();
+    const companyData = companySnap.exists ? companySnap.data() || {} : {};
+    return {
+      toolAccess: normalizeToolFlags(companyData.defaultToolAccess, true),
+      premiumTools: normalizeToolFlags(companyData.defaultPremiumTools, true),
+    };
+  } catch {
+    return {
+      toolAccess: buildDefaultToolFlags(true),
+      premiumTools: buildDefaultToolFlags(true),
+    };
+  }
+};
+
 /**
  * Crea el documento del usuario en Firestore si no existe todavía.
  * Se llama al hacer login por primera vez.
@@ -103,6 +126,7 @@ const registerUserIfNew = async (uid) => {
   const userRecord = await auth.getUser(uid);
   const now = FieldValue.serverTimestamp();
   const matchedCompanyId = await findCompanyIdByEmailDomain(db, userRecord.email);
+  const companyAccessDefaults = await getCompanyAccessDefaults(db, matchedCompanyId);
 
   if (!doc.exists) {
     // Primera vez — crear documento completo
@@ -117,8 +141,8 @@ const registerUserIfNew = async (uid) => {
       premiumSource: null,
       companyId: matchedCompanyId,
       companyAssignedByDomain: !!matchedCompanyId,
-      toolAccess: buildDefaultToolFlags(true),
-      premiumTools: buildDefaultToolFlags(true),
+      toolAccess: companyAccessDefaults.toolAccess,
+      premiumTools: companyAccessDefaults.premiumTools,
       lastStripeSessionId: null,
       payments: [],
       createdAt: now,

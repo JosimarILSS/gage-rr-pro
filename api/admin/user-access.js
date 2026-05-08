@@ -68,6 +68,29 @@ const findCompanyIdByEmailDomain = async (db, email) => {
   return legacyMatch ? legacyMatch.id : null;
 };
 
+const getCompanyAccessDefaults = async (db, companyId) => {
+  if (!companyId) {
+    return {
+      toolAccess: normalizeToolFlags(null, true),
+      premiumTools: normalizeToolFlags(null, true),
+    };
+  }
+
+  try {
+    const companySnap = await db.collection(COMPANIES_COLLECTION).doc(companyId).get();
+    const companyData = companySnap.exists ? companySnap.data() || {} : {};
+    return {
+      toolAccess: normalizeToolFlags(companyData.defaultToolAccess, true),
+      premiumTools: normalizeToolFlags(companyData.defaultPremiumTools, true),
+    };
+  } catch {
+    return {
+      toolAccess: normalizeToolFlags(null, true),
+      premiumTools: normalizeToolFlags(null, true),
+    };
+  }
+};
+
 const ensureAuthorizedAdmin = async (req, res) => {
   const decodedToken = await verifyFirebaseToken(req, res);
   if (!decodedToken) return null;
@@ -369,18 +392,23 @@ module.exports = async function handler(req, res) {
     const currentPremiumUnlimited = currentPremium && !currentPremiumExpiresAt;
     const nextPremium = hasPremiumChange ? premium : currentPremium;
     const nextUnlimited = hasPremiumChange ? unlimited : currentPremiumUnlimited;
-    const nextToolAccess = hasToolAccessInput
-      ? toolAccessInput
-      : normalizeToolFlags(existingData.toolAccess, true);
-    const nextPremiumTools = hasPremiumToolsInput
-      ? premiumToolsInput
-      : normalizeToolFlags(existingData.premiumTools, true);
     const existingCompanyId = normalizeCompanyIdInput(existingData.companyId);
     const domainCompanyId =
       !hasCompanyInput && !existingCompanyId
         ? await findCompanyIdByEmailDomain(db, userRecord.email || email)
         : null;
     const nextCompanyId = hasCompanyInput ? companyIdInput : existingCompanyId || domainCompanyId;
+    const companyAccessDefaults = await getCompanyAccessDefaults(db, nextCompanyId);
+    const nextToolAccess = hasToolAccessInput
+      ? toolAccessInput
+      : snap.exists
+        ? normalizeToolFlags(existingData.toolAccess, true)
+        : companyAccessDefaults.toolAccess;
+    const nextPremiumTools = hasPremiumToolsInput
+      ? premiumToolsInput
+      : snap.exists
+        ? normalizeToolFlags(existingData.premiumTools, true)
+        : companyAccessDefaults.premiumTools;
 
     let premiumExpiresAt = null;
     let premiumExpiresAtTimestamp = null;

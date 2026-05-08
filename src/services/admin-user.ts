@@ -29,6 +29,8 @@ type AdminCompany = {
   emailDomain: string | null;
   emailDomainEnabled: boolean;
   defaultTheme: CompanyDefaultTheme;
+  defaultToolAccess: ToolFlags;
+  defaultPremiumTools: ToolFlags;
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -45,6 +47,8 @@ type CreateAdminCompanyPayload = {
   emailDomain?: string | null;
   emailDomainEnabled?: boolean;
   defaultTheme?: CompanyDefaultTheme;
+  defaultToolAccess?: ToolFlags;
+  defaultPremiumTools?: ToolFlags;
 };
 
 type UpdateAdminCompanyPayload = CreateAdminCompanyPayload & {

@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizeToolFlags } = require('./_tools.js');
+
 const COMPANIES_COLLECTION = 'empresas';
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const MAX_NAME_LENGTH = 120;
@@ -111,6 +113,8 @@ const buildCompanyPayload = (body) => {
       emailDomainLower: emailDomain,
       emailDomainEnabled: emailDomainEnabled && emailDomains.length > 0,
       defaultTheme: normalizeDefaultTheme(body?.defaultTheme),
+      defaultToolAccess: normalizeToolFlags(body?.defaultToolAccess, true),
+      defaultPremiumTools: normalizeToolFlags(body?.defaultPremiumTools, true),
       isActive: body?.isActive === false ? false : true,
     },
   };
@@ -138,6 +142,8 @@ const mapCompanyDoc = (docSnap) => {
     emailDomain: emailDomains[0] || null,
     emailDomainEnabled: data.emailDomainEnabled === true && emailDomains.length > 0,
     defaultTheme: normalizeDefaultTheme(data.defaultTheme),
+    defaultToolAccess: normalizeToolFlags(data.defaultToolAccess, true),
+    defaultPremiumTools: normalizeToolFlags(data.defaultPremiumTools, true),
     isActive: data.isActive !== false,
     createdAt: toIsoOrNull(data.createdAt),
     updatedAt: toIsoOrNull(data.updatedAt),
