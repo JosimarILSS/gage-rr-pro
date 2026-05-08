@@ -642,10 +642,28 @@ export default function AdminUserAccessPage({
           : [...current, result.company];
         return next.sort((a, b) => a.name.localeCompare(b.name, locale));
       });
+
+      if (editingCompany) {
+        const nextToolAccess = normalizeToolFlags(result.company.defaultToolAccess, true);
+        const nextPremiumTools = normalizeToolFlags(result.company.defaultPremiumTools, true);
+
+        setUsers((current) =>
+          current.map((user) =>
+            user.companyId === result.company.id
+              ? {
+                  ...user,
+                  toolAccess: nextToolAccess,
+                  premiumTools: nextPremiumTools,
+                }
+              : user
+          )
+        );
+      }
+
       resetCompanyEditor();
       setSuccess(
         editingCompany
-          ? `Empresa actualizada: ${result.company.name}.`
+          ? `Empresa actualizada: ${result.company.name}. Usuarios actualizados: ${result.affectedUsers ?? 0}.`
           : `Empresa creada: ${result.company.name}.`
       );
     } catch (err: any) {

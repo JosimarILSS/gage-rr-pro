@@ -1,5 +1,6 @@
 'use strict';
 
+const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getFirebaseApp, verifyFirebaseToken } = require('../_firebase.js');
 const {
@@ -75,6 +76,69 @@ const ensureUniqueActiveDomains = async (db, emailDomains, currentCompanyId = nu
   }
 
   return null;
+};
+
+const syncAssignedUsersCompanyDefaults = async (app, db, companyId, payload, serverNow) => {
+  const assignedUsersSnap = await db
+    .collection('usuarios')
+    .where('companyId', '==', companyId)
+    .get();
+
+  const userDefaults = {
+    toolAccess: payload.defaultToolAccess,
+    premiumTools: payload.defaultPremiumTools,
+  };
+
+  let batch = db.batch();
+  let operations = 0;
+  let affectedUsers = 0;
+
+  for (const userDoc of assignedUsersSnap.docs) {
+    batch.update(userDoc.ref, {
+      ...userDefaults,
+      updatedAt: serverNow,
+    });
+    operations += 1;
+    affectedUsers += 1;
+
+    if (operations >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      operations = 0;
+    }
+  }
+
+  if (operations > 0) {
+    await batch.commit();
+  }
+
+  const auth = getAuth(app);
+  let customClaimsUpdated = 0;
+  let customClaimsFailed = 0;
+
+  for (const userDoc of assignedUsersSnap.docs) {
+    try {
+      const userRecord = await auth.getUser(userDoc.id);
+      await auth.setCustomUserClaims(userDoc.id, {
+        ...(userRecord.customClaims || {}),
+        ...userDefaults,
+        companyId,
+      });
+      customClaimsUpdated += 1;
+    } catch (error) {
+      customClaimsFailed += 1;
+      console.error(
+        `[admin-companies:sync-users] Failed to sync claims for ${userDoc.id}:`,
+        error.message
+      );
+    }
+  }
+
+  return {
+    affectedUsers,
+    customClaimsUpdated,
+    customClaimsFailed,
+  };
 };
 
 module.exports = async function handler(req, res) {
@@ -202,10 +266,14 @@ module.exports = async function handler(req, res) {
         updatedAt: now,
       });
 
+      const userSync = await syncAssignedUsersCompanyDefaults(app, db, companyId, payload, now);
       const updatedSnap = await companyRef.get();
       res.status(200).json({
         ok: true,
         company: mapCompanyDoc(updatedSnap),
+        affectedUsers: userSync.affectedUsers,
+        customClaimsUpdated: userSync.customClaimsUpdated,
+        customClaimsFailed: userSync.customClaimsFailed,
       });
       return;
     }

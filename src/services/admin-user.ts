@@ -83,6 +83,9 @@ type ListAdminCompaniesResult = {
 type CreateAdminCompanyResult = {
   ok: boolean;
   company: AdminCompany;
+  affectedUsers?: number;
+  customClaimsUpdated?: number;
+  customClaimsFailed?: number;
 };
 
 type DeleteAdminCompanyResult = {
