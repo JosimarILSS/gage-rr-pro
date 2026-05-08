@@ -50,13 +50,33 @@ const normalizeCompanyId = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
-const readCompanyBrand = async (companyId: string | null): Promise<CompanyBrand | null> => {
+const readCompanyBrand = async (
+  user: User,
+  companyId: string | null,
+  apiBaseUrl = ''
+): Promise<CompanyBrand | null> => {
   if (!companyId) return null;
 
   try {
     const snap = await getDoc(doc(db, 'empresas', companyId));
-    if (!snap.exists()) return null;
-    return normalizeCompanyBrand(snap.id, snap.data());
+    if (snap.exists()) {
+      const brand = normalizeCompanyBrand(snap.id, snap.data());
+      if (brand) return brand;
+    }
+  } catch {
+    // Si las reglas del cliente no permiten leer empresas, se intenta el endpoint autenticado.
+  }
+
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch(`${apiBaseUrl}/api/user/company-brand`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const companyBrand = data?.companyBrand;
+    return normalizeCompanyBrand(companyBrand?.id, companyBrand);
   } catch {
     return null;
   }
@@ -114,26 +134,38 @@ const buildProfile = (
   };
 };
 
-export const getUserAccountProfile = async (user: User | null): Promise<UserAccountProfile | null> => {
+export const getUserAccountProfile = async (
+  user: User | null,
+  apiBaseUrl = ''
+): Promise<UserAccountProfile | null> => {
   if (!user) return null;
+
+  const readClaims = async () => {
+    try {
+      const tokenResult = await user.getIdTokenResult(true);
+      return tokenResult.claims as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  };
 
   try {
     const snap = await getDoc(doc(db, 'usuarios', user.uid));
     if (snap.exists()) {
       const data = snap.data();
-      const companyId = normalizeCompanyId(data.companyId);
-      const companyBrand = await readCompanyBrand(companyId);
-      return buildProfile(user, data, {}, companyBrand);
+      const claims = await readClaims();
+      const companyId = normalizeCompanyId(data.companyId) || normalizeCompanyId(claims.companyId);
+      const companyBrand = await readCompanyBrand(user, companyId, apiBaseUrl);
+      return buildProfile(user, data, claims, companyBrand);
     }
   } catch {
     // Si Firestore falla, se usa Custom Claims como respaldo.
   }
 
   try {
-    const tokenResult = await user.getIdTokenResult(true);
-    const claims = tokenResult.claims as Record<string, unknown>;
+    const claims = await readClaims();
     const companyId = normalizeCompanyId(claims.companyId);
-    const companyBrand = await readCompanyBrand(companyId);
+    const companyBrand = await readCompanyBrand(user, companyId, apiBaseUrl);
     return buildProfile(user, {}, claims, companyBrand);
   } catch {
     return buildProfile(user);

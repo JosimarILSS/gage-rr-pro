@@ -67,11 +67,11 @@ export const useAuthSession = (lang: Lang): UseAuthSessionResult => {
   );
 
   const refreshAccountProfile = useCallback(async (targetUser: User | null) => {
-    const profile = await getUserAccountProfile(targetUser);
+    const profile = await getUserAccountProfile(targetUser, apiBaseUrl);
     setAccountProfile(profile);
     setEsPremium(profile?.premiumActive === true && isToolEnabled(profile?.premiumTools, 'gage-rr', true));
     return profile;
-  }, []);
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {

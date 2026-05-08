@@ -211,12 +211,7 @@ export default function ToolsPage({
       ? 'app-badge-warning'
       : '';
   const canOpenTool = (toolId: ToolId) => isToolEnabled(toolAccess, toolId, true);
-  const getToolCardClass = (toolId: ToolId) =>
-    `group min-h-[220px] text-left app-card p-5 flex flex-col ${
-      canOpenTool(toolId)
-        ? 'app-card-hover cursor-pointer'
-        : 'opacity-60 cursor-not-allowed'
-    }`;
+  const toolCardClass = 'group min-h-[220px] text-left app-card app-card-hover cursor-pointer p-5 flex flex-col';
   const handleToolOpen = (toolId: ToolId, callback: () => void) => {
     if (!canOpenTool(toolId)) return;
     callback();
@@ -279,83 +274,77 @@ export default function ToolsPage({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            <button
-              type="button"
-              onClick={() => handleToolOpen('gage-rr', onOpenGageRR)}
-              disabled={!canOpenTool('gage-rr')}
-              className={getToolCardClass('gage-rr')}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="app-icon-tile app-icon-tile-lg">
-                  <BarChart3 className="w-6 h-6" />
+            {canOpenTool('gage-rr') && (
+              <button
+                type="button"
+                onClick={() => handleToolOpen('gage-rr', onOpenGageRR)}
+                className={toolCardClass}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="app-icon-tile app-icon-tile-lg">
+                    <BarChart3 className="w-6 h-6" />
+                  </div>
                 </div>
-                <span className={`app-badge ${canOpenTool('gage-rr') ? 'app-badge-success' : 'app-badge-danger'}`}>
-                  {canOpenTool('gage-rr') ? copy.toolStatus : copy.noAccess}
-                </span>
-              </div>
 
-              <div className="mt-5 flex-1">
-                <h3 className="text-lg app-title">{copy.toolTitle}</h3>
-                <p className="text-sm app-muted mt-2 leading-6">{copy.toolDescription}</p>
-              </div>
-
-              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
-                {copy.openTool}
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleToolOpen('six-sigma', onOpenSixSigma)}
-              disabled={!canOpenTool('six-sigma')}
-              className={getToolCardClass('six-sigma')}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="app-icon-tile app-icon-tile-lg app-icon-tile-success">
-                  <TrendingUp className="w-6 h-6" />
+                <div className="mt-5 flex-1">
+                  <h3 className="text-lg app-title">{copy.toolTitle}</h3>
+                  <p className="text-sm app-muted mt-2 leading-6">{copy.toolDescription}</p>
                 </div>
-                <span className={`app-badge ${canOpenTool('six-sigma') ? 'app-badge-success' : 'app-badge-danger'}`}>
-                  {canOpenTool('six-sigma') ? copy.toolStatus : copy.noAccess}
-                </span>
-              </div>
 
-              <div className="mt-5 flex-1">
-                <h3 className="text-lg app-title">{copy.sixSigmaTitle}</h3>
-                <p className="text-sm app-muted mt-2 leading-6">{copy.sixSigmaDescription}</p>
-              </div>
-
-              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
-                {copy.openTool}
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleToolOpen('feed-forward', onOpenFeedForward)}
-              disabled={!canOpenTool('feed-forward')}
-              className={getToolCardClass('feed-forward')}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="app-icon-tile app-icon-tile-lg app-icon-tile-warning">
-                  <MessageSquare className="w-6 h-6" />
+                <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
+                  {copy.openTool}
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </div>
-                <span className={`app-badge ${canOpenTool('feed-forward') ? 'app-badge-success' : 'app-badge-danger'}`}>
-                  {canOpenTool('feed-forward') ? copy.toolStatus : copy.noAccess}
-                </span>
-              </div>
+              </button>
+            )}
 
-              <div className="mt-5 flex-1">
-                <h3 className="text-lg app-title">{copy.feedForwardTitle}</h3>
-                <p className="text-sm app-muted mt-2 leading-6">{copy.feedForwardDescription}</p>
-              </div>
+            {canOpenTool('six-sigma') && (
+              <button
+                type="button"
+                onClick={() => handleToolOpen('six-sigma', onOpenSixSigma)}
+                className={toolCardClass}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="app-icon-tile app-icon-tile-lg app-icon-tile-success">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                </div>
 
-              <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
-                {copy.openTool}
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </button>
+                <div className="mt-5 flex-1">
+                  <h3 className="text-lg app-title">{copy.sixSigmaTitle}</h3>
+                  <p className="text-sm app-muted mt-2 leading-6">{copy.sixSigmaDescription}</p>
+                </div>
+
+                <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
+                  {copy.openTool}
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </button>
+            )}
+
+            {canOpenTool('feed-forward') && (
+              <button
+                type="button"
+                onClick={() => handleToolOpen('feed-forward', onOpenFeedForward)}
+                className={toolCardClass}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="app-icon-tile app-icon-tile-lg app-icon-tile-warning">
+                    <MessageSquare className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="mt-5 flex-1">
+                  <h3 className="text-lg app-title">{copy.feedForwardTitle}</h3>
+                  <p className="text-sm app-muted mt-2 leading-6">{copy.feedForwardDescription}</p>
+                </div>
+
+                <div className="mt-5 inline-flex items-center gap-2 text-sm app-link-action">
+                  {copy.openTool}
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </button>
+            )}
           </div>
         </section>
 
