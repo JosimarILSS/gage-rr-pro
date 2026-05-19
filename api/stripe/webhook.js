@@ -2,6 +2,7 @@
 
 const Stripe = require('stripe');
 const { grantPremiumAccessFromSession } = require('../_firebase.js');
+const { isAppCheckoutSession } = require('./_metadata.js');
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -54,6 +55,12 @@ async function handler(req, res) {
       event.type === 'checkout.session.async_payment_succeeded'
     ) {
       const session = event.data.object;
+      if (!isAppCheckoutSession(session)) {
+        console.log(`[webhook] Ignoring external checkout session ${session.id}`);
+        res.status(200).json({ received: true, ignored: true });
+        return;
+      }
+
       console.log(`[webhook] Processing session ${session.id}, payment_status=${session.payment_status}`);
       await grantPremiumAccessFromSession(session, 'webhook');
       console.log(`[webhook] Premium granted for session ${session.id}`);

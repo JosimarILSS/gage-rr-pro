@@ -2,6 +2,7 @@
 
 const Stripe = require('stripe');
 const { verifyFirebaseToken, grantPremiumAccessFromSession } = require('../_firebase.js');
+const { isAppCheckoutSession } = require('./_metadata.js');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -33,6 +34,11 @@ module.exports = async function handler(req, res) {
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const sessionUid = session?.metadata?.firebaseUid || session?.client_reference_id;
+
+    if (!isAppCheckoutSession(session)) {
+      res.status(403).json({ error: 'Session does not belong to this app.' });
+      return;
+    }
 
     if (!sessionUid || sessionUid !== decodedToken.uid) {
       res.status(403).json({ error: 'Session does not belong to current user.' });

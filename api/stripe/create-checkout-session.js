@@ -5,6 +5,7 @@ const { verifyFirebaseToken } = require('../_firebase.js');
 const { getApps } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { isToolEnabled } = require('../_tools.js');
+const { buildAppCheckoutMetadata } = require('./_metadata.js');
 
 const normalizeReturnPath = (value) => {
   if (typeof value !== 'string') return '/';
@@ -80,7 +81,10 @@ module.exports = async function handler(req, res) {
       cancel_url: cancelUrl,
       customer_email: decodedToken.email || undefined,
       client_reference_id: decodedToken.uid,
-      metadata: { firebaseUid: decodedToken.uid },
+      metadata: buildAppCheckoutMetadata(decodedToken.uid),
+      payment_intent_data: {
+        metadata: buildAppCheckoutMetadata(decodedToken.uid),
+      },
     });
 
     console.log('[create-checkout] Session created:', session.id);
